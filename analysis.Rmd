@@ -1,24 +1,46 @@
 ---
-title: "Analysis"
+title: "Analysis for Hoecker and Higuera XXXX: "
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, results  = 'hide', message = FALSE, warning = FALSE)
 ```
 
 ## Setup
-Load the requisite packages and data files for the analysis
-```{r cars}
-library(dplyr)
-library(ggplot2)
-library(zoo)
-library(cowplot)
-library(GGally)
-library(Hmisc)
+
+Specify lakes and time period of analysis.
+```{r}
+lakes = c('BB15','DU15','MA15','NW15','SH15','TL15','UR15') 
+studyPeriod <- c(1550,2015)
 ```
 
-## Including Plots
+Load the requisite packages and data files for the analysis.
+```{r}
+library(dplyr) # For data manipulation
+library(zoo) # For rolling statistics 
+library(ggplot2) # For plotting
+```
+
+Load charcoal data (data should be stored in the same directory as 'analysis.Rmd'). These data have already undergone peak analysis and interpolation in CharAnalysis (https://github.com/phiguera/CharAnalysis). Raw charcoal count data and CharAnalysis input files available here: _____________________[Figshare Link?]
+```{r}
+char.ldf = lapply(paste0(lakes,'_charResults.csv'),read.csv)   
+
+char.df <- char.ldf %>%
+  bind_rows() %>%
+  mutate(ageCE = 1950 - ageTop,
+         peakYr = ifelse(peaksFinal == 1,ageCE,NA),
+         peakInsigYr = ifelse(peaksInsig == 1,ageCE,NA),
+         peakYr1 = ifelse(peaks1 == 1,ageCE,NA),
+         peakYr2 = ifelse(peaks2 == 1,ageCE,NA),
+         peakYr3 = ifelse(peaks3 == 1,ageCE,NA)) %>%
+  filter(ageCE >= studyPeriod[1]) %>%
+  group_by(lake) %>%
+         mutate(length = max(ageCE) - min(ageCE)) 
+```
+
+
+
 
 You can also embed plots, for example:
 
