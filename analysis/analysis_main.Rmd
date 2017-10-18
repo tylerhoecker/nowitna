@@ -17,9 +17,10 @@ library(ggplot2) # For plotting
 library(knitr) # For formatting this file 
 ```
 
-Specify directory on your machine containing data (ends with 'nowitna/data')
+Specify directory on your machine containing data (ends with 'nowitna/data') and code (ends with 'nowitna/code')
 ```{r}
 dataDir <- "/Users/tylerhoecker/GitHub/nowitna/data/"
+codeDir <- "/Users/tylerhoecker/GitHub/nowitna/analysis"
 ```
 
 Specify lakes and time period of analysis.
@@ -146,23 +147,17 @@ dat <- do.call(rbind,lapply(dataframes,data.frame,stringsAsFactors=TRUE))
 dat <- dat[,c('char','age','lake')]
 ```
 
-Execute the method for building a composite biomass burning record used in Kelly et al. 2013 (10.1073/pnas.1305069110). The method estimates the parameters of a zero-inflated log-normal (ZIL) distribution of pooled charcoal counts in continuous moving windows of a user-defined width. In this analysis, 5-year and 50-year window widths are used (2.5 and 25 half-kernel widths, respectively), so the procedure runs twice, onces for each window width. 
+Execute the method for building a composite biomass burning record used in Kelly et al. 2013 (10.1073/pnas.1305069110). The method estimates the parameters of a zero-inflated log-normal (ZIL) distribution of pooled charcoal counts in continuous moving windows of a user-defined width. In this analysis, 5-year and 50-year window widths are used (2.5 and 25 half-kernel widths, respectively).
 
-This portion of the analysis is relegated to a separate R script for clarity of the workflow. The user-defined parameters, however, can be adjusted here.
+This portion of the analysis is relegated to a separate R script for clarity of the workflow. Window widths and other parameters can be manipulated within the script.
+
 ```{r}
-# Interval for fitted x's
-timeStep <- 
-gih
+source(file = file.path(codeDir,"analysis_composite.R"))
 ```
 
-
-
-
-
-You can also embed plots, for example:
-
+View composite record.
 ```{r pressure, echo=FALSE}
-plot(pressure)
+plot(composite.df$yrBP,composite.df$lowMean)
 ```
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
