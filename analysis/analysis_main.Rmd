@@ -30,7 +30,7 @@ studyPeriod <- c(1550,2015)
 
 Load charcoal data (data should be stored in the same directory as 'analysis.Rmd'). These data have already undergone peak analysis and interpolation in CharAnalysis (https://github.com/phiguera/CharAnalysis). Raw charcoal count data and CharAnalysis input files available here: [Figshare Link?]
 ```{r}
-char.ldf <- lapply(paste0(dataDir,lakes,'_charResults.csv'),read.csv)   
+char.ldf <- lapply(paste0(dataDir,'charResults_',lakes,'.csv'),read.csv)   
 
 char.df <- char.ldf %>%
   bind_rows() %>%
@@ -47,7 +47,7 @@ char.df <- char.ldf %>%
 
 Load observed fire event data.
 ```{r}
-observed.df <- read.csv('data/manual_fires_observed.csv')
+observed.df <- read.csv(paste0(dataDir,'/manual_fires_observed.csv'))
 obs.1km <- filter(observed.df,distance == 1.0) %>%
   rename(obsCE = ageCE)
 ```
@@ -108,11 +108,54 @@ kable(
 )
 ```
 
-## At this point load prepared composite biomass burning records.
+## Build composite biomass burning recrod from individual records. 
+Import raw charcoal count data.
+```{r}
+# Import selected regions / alaska 
+dataframes <- lapply(paste0(dataDir,'charData_',lakes,'.csv'),read.csv) 
+```
+Derive and standardize charcoal accumulation rates (# cm2 yr-1, "CHAR").
+```{r}
+# Derive CHAR -------------------------------------------------------------
+# Calculate and standardize CHAR 
+for (i in 1:length(lakes)){
+  # Calculate sediment accumulation rates (dataframes[[i]]$sedAcc) [cm/yr] 
+  dataframes[[i]][,'sedAcc'] <- 
+    (dataframes[[i]][,'cmTop']-dataframes[[i]][,'cmBot'])/
+    (dataframes[[i]][,'ageTop']-dataframes[[i]][,'ageBot']) 
+  # Calculate charcoal accumulation rates (dataframes[[i]]$char) [#/cm2/yr]
+  dataframes[[i]][,'char'] <- 
+    (dataframes[[i]][,'charCount']/dataframes[[i]][,'charVol'])*
+    dataframes[[i]][,'sedAcc'] 
+  # Log transform non-zero char
+  nonZero <- which(dataframes[[i]][,'char'] > 0)
+  transChar <- log(dataframes[[i]][nonZero,'char'])
+  # Z-score transformed char
+  zChar <- (transChar - mean(transChar, na.rm=T)) / sd(transChar, na.rm = T)
+  # Exponentiate
+  dataframes[[i]][nonZero,'char'] <- exp(zChar)
+  # Average sample age (this added to work with RK scripts)
+  dataframes[[i]][,'age'] <- 
+    round(rowMeans(dataframes[[i]][,c('ageTop','ageBot')], na.rm = T))
+  # Site/lake name
+  dataframes[[i]][,'lake'] <- lakes[i]
+}
+
+# Turn multiple dataframes into one long data frame
+dat <- do.call(rbind,lapply(dataframes,data.frame,stringsAsFactors=TRUE))
+dat <- dat[,c('char','age','lake')]
+```
+
+Execute the method for building a composite biomass burning record used in Kelly et al. 2013 (10.1073/pnas.1305069110). The method estimates the parameters of a zero-inflated log-normal (ZIL) distribution of pooled charcoal counts in continuous moving windows of a user-defined width. In this analysis, 5-year and 50-year window widths are used (2.5 and 25 half-kernel widths, respectively), so the procedure runs twice, onces for each window width. 
+
+This portion of the analysis is relegated to a separate R script for clarity of the workflow. The user-defined parameters, however, can be adjusted here.
+```{r}
+# Interval for fitted x's
+timeStep <- 
+gih
+```
 
 
-## Derive composite charcoal record.
-This portion runs R scripts that calculate a composite record of biomass burning based on all of the records in the region together. This code is used with permission from Ryan Kelly
 
 
 
