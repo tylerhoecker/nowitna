@@ -143,7 +143,7 @@ y    <- y[!is.na(y)]
 
 # Get unique site names
 sites <- lakes
-n.sites <- nLakes
+n.sites <- length(lakes)
 
 # X vals to calculate at, X vector lengths
 xx <- seq(ageLim[1],ageLim[2],xxStep)
