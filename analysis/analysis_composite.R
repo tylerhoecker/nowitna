@@ -1,4 +1,4 @@
-# ------------------ Load Ryan Kelly functions for ZIL procedure 
+# ------------------ Load Ryan Kelly's functions for ZIL procedure 
 # Wrapper function returning kernel weights (K), standardized weights (w), and the effective sample size (n). 
 ry.kernel = function(x, x0, h, kernel.fn) {
   dists = abs(x-x0)
@@ -113,7 +113,6 @@ ZIlnorm.median = function(parms) {
   }
 }()
 
-###########################################################################
 #-------------------- RUN ZIL PROCEDURE ----------------------------------#
 #------------------- Parameters 
 # Temporal params
@@ -420,15 +419,16 @@ output05$mean.se = apply(boot.means,1,sd,na.rm=T)
 #-------------------- Combine output
 composite.df <- data.frame(
   yrBP = output50$yr.bp,
+  yrCE = 1950-output50$yr.bp,
   nRecords = output50$n.records,
   lowMean = output50$composite.mean,
   lowMedian = output50$composite.med,
   lowCIlower = output50$CI.lower,
   lowCIupper = output50$ CI.upper,
-  highMean = output50$composite.mean,
-  highMedian = output50$composite.med,
-  highCIlower = output50$CI.lower,
-  highCIupper = output50$ CI.upper
+  highMean = output05$composite.mean,
+  highMedian = output05$composite.med,
+  highCIlower = output05$CI.lower,
+  highCIupper = output05$ CI.upper
 )
 
 

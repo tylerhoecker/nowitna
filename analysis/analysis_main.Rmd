@@ -17,7 +17,7 @@ library(ggplot2) # For plotting
 library(knitr) # For formatting this file 
 ```
 
-Specify directory on your machine containing data (ends with 'nowitna/data') and code (ends with 'nowitna/code')
+Specify directory on your machine containing data (ends with 'nowitna/data') and code (ends with 'nowitna/analysis')
 ```{r}
 dataDir <- "/Users/tylerhoecker/GitHub/nowitna/data/"
 codeDir <- "/Users/tylerhoecker/GitHub/nowitna/analysis"
@@ -46,14 +46,20 @@ char.df <- char.ldf %>%
          mutate(length = max(ageCE) - min(ageCE)) 
 ```
 
-Load observed fire event data.
+Load observed (historic) fire event data.
 ```{r}
-observed.df <- read.csv(paste0(dataDir,'/manual_fires_observed.csv'))
+observed.df <- read.csv(paste0(dataDir,'/observedfireData.csv'))
 obs.1km <- filter(observed.df,distance == 1.0) %>%
   rename(obsCE = ageCE)
 ```
 
-## Summarize various charcoal record and fire history metrics 
+Load tree demography data.
+```{r}
+
+```
+
+
+## Summarize fire event metrics 
 
 Mean signal to noise indices of records during study period:
 ```{r results  = 'asis'}
@@ -109,6 +115,61 @@ kable(
 )
 ```
 
+
+
+## Calculate proportion of sites burned through time, using 50-year windows in continuous 5-year time steps.
+```{r}
+window = 50
+timeStep = 5
+
+sitesByYear <- char.df %>%
+  group_by(ageCE) %>%
+  summarise(sites = n()) 
+
+pctBurned <- char.df %>% 
+  filter(!is.na(peakYr)) %>%
+  group_by(peakYr) %>%
+  summarise(n.burned = n()) %>%
+  rename(ageCE = peakYr) %>%
+  full_join(sitesByYear,.) %>%
+  mutate(n.burned = ifelse(!is.na(n.burned),n.burned,0)) %>%
+  # Window
+  mutate(win.total = rollapply(sites, window/timeStep, fill= NA,
+                               FUN = mean, na.rm =T)) %>%
+  mutate(win.burn = rollsum(n.burned, window/timeStep, fill= NA)) %>%
+  mutate(win.pct = win.burn/win.total*100) 
+
+
+modernTime <- seq(1950,2015,1)
+modernSites = data.frame('ageCE' = modernTime, 'sites' = 6)
+
+pctModern <- observed.df %>%
+  filter(distance == 1) %>%
+  group_by(ageCE) %>%
+  summarise(n.burned = n()) %>%
+  full_join(modernSites,.) %>%
+  mutate(n.burned = ifelse(!is.na(n.burned),n.burned,0)) %>%
+  # Window
+  mutate(win.total = rollapply(sites, window, fill= NA,
+                               FUN = mean, na.rm =T)) %>%
+  mutate(win.burn = rollsum(n.burned, window, fill= NA)) %>%
+  mutate(win.pct = win.burn/win.total*100) 
+```
+
+Plot the result, a time series of FRI (grey squares), percent sites burned based on the charcoal record (black line), and percent sites burned based on observed fire data since 1950 (red line).
+```{r pressure}
+ ggplot(filter(pctBurned, ageCE>1550), aes(x = ageCE, y = win.pct)) +
+  geom_step(data = pctModern, direction = 'vh', color = 'red3', size = 1) +
+  geom_step(direction = 'vh') +
+  geom_point(data = FRI, aes(x = peakYr, y = FRI/2), shape = 22, fill = 'grey50', size = 2) +
+  scale_x_continuous(limits = studyPeriod, breaks = seq(studyPeriod[1],studyPeriod[2],50)) +
+  scale_y_continuous(limits = c(0,100), sec.axis = sec_axis(trans = ~.*2,name = 'Fire return interval (yr)')) +
+  labs(y = 'Percent of sites burned', x = 'Year CE') +
+  theme_bw(base_size = 14)
+```
+
+
+
 ## Build composite biomass burning recrod from individual records. 
 Import raw charcoal count data.
 ```{r}
@@ -151,13 +212,24 @@ Execute the method for building a composite biomass burning record used in Kelly
 
 This portion of the analysis is relegated to a separate R script for clarity of the workflow. Window widths and other parameters can be manipulated within the script.
 
-```{r}
+```{r message=FALSE}
 source(file = file.path(codeDir,"analysis_composite.R"))
 ```
 
-View composite record.
-```{r pressure, echo=FALSE}
-plot(composite.df$yrBP,composite.df$lowMean)
+Plot the result, a composite record of biomass burning.
+```{r pressure}
+ggplot(composite.df, aes(x=yrCE)) +
+  geom_col(aes(y = highMean), fill = 'grey50', width = 5) +
+  geom_ribbon(aes(ymin = lowCIlower, ymax = lowCIupper), alpha = 0.2) +
+  geom_line(aes(y = lowMean)) +
+  scale_x_continuous(limits = studyPeriod, 
+                     breaks = seq(studyPeriod[1],studyPeriod[2],50)) +
+  scale_y_continuous(breaks = c(0,1,2,3)) +
+  labs(y = 'Biomass burning\n(standardized CHAR)', 
+       x = 'Year CE') +
+  coord_cartesian(ylim = c(0,3)) +
+  theme_bw(base_size = 14) 
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+## Compare proxies
