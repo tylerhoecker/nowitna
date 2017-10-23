@@ -419,7 +419,7 @@ output05$mean.se = apply(boot.means,1,sd,na.rm=T)
 #-------------------- Combine output
 composite.df <- data.frame(
   yrBP = output50$yr.bp,
-  yrCE = 1950-output50$yr.bp,
+  ageCE = 1950-output50$yr.bp,
   nRecords = output50$n.records,
   lowMean = output50$composite.mean,
   lowMedian = output50$composite.med,
