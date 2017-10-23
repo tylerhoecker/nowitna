@@ -201,7 +201,7 @@ pctModern <- observed.df %>%
 ```
 
 Plot the result, a time series of FRI (grey squares), percent sites burned based on the charcoal record (black line), and percent sites burned based on observed fire data since 1950 (red line).
-```{r collapse = T}
+```{r}
  ggplot(filter(pctBurned, ageCE>1550), aes(x = ageCE, y = win.pct)) +
   geom_step(data = pctModern, direction = 'vh', color = 'red3', size = 1) +
   geom_step(direction = 'vh') +
@@ -346,6 +346,8 @@ kable(
   caption = 'P-Value',
 )
 ```
+
+Calculate correlation among fire, tree and CRU climate records.
 
 
 
