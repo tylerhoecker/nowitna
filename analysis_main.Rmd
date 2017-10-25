@@ -19,10 +19,9 @@ library(ggplot2) # For plotting
 library(knitr) # For formatting this file 
 ```
 
-Specify directory on your machine containing data (ends with 'nowitna/data') and code (ends with 'nowitna/analysis')
+Specify directory on your machine containing data (ends with 'nowitna/data') 
 ```{r}
 dataDir <- "/Users/tylerhoecker/GitHub/nowitna/data/"
-codeDir <- "/Users/tylerhoecker/GitHub/nowitna/analysis"
 ```
 
 Specify lakes and time period of analysis.
@@ -175,7 +174,7 @@ pctModern <- observed.df %>%
 ```
 
 Plot the result, a time series of FRI (grey squares), percent sites burned based on the charcoal record (black line), and percent sites burned based on observed fire data since 1950 (red line).
-```{r}
+```{r echo = FALSE}
  ggplot(filter(pctBurned, ageCE>1550), aes(x = ageCE, y = win.pct)) +
   geom_step(data = pctModern, direction = 'vh', color = 'red3', size = 1) +
   geom_step(direction = 'vh') +
@@ -229,10 +228,10 @@ dat <- dat[,c('char','age','lake')]
 
 Execute the method for building a composite biomass burning record used in Kelly et al. 2013 (10.1073/pnas.1305069110). The method estimates the parameters of a zero-inflated log-normal (ZIL) distribution of pooled charcoal counts in continuous moving windows of a user-defined width. In this analysis, 5-year and 50-year window widths are used (2.5 and 25 half-kernel widths, respectively).
 
-This portion of the analysis is relegated to a separate R script for clarity of the workflow. Window widths and other parameters can be manipulated within the script.
+This portion of the analysis is relegated to a separate R script for clarity of the workflow. Window widths and other parameters can be manipulated within the 'analysis_composite.r' script.
 
 ```{r message=FALSE}
-source(file = file.path(codeDir,"analysis_composite.R"))
+source(file = file.path("analysis_composite.R"))
 ```
 
 Plot the result, a composite record of biomass burning.
@@ -259,8 +258,8 @@ tree.df %>%
   summarise(count = n()) 
 ```
 
-View time series of estimated pith dates by species.
-```{r}
+Plot the result, a time series of estimated pith dates by species.
+```{r echo = FALSE}
 speciesColors <- c("#E69F00", "#D55E00", "#4286f4","#009E73","#E69F00")
 
 ggplot(tree.df, aes(x = pith)) + theme_bw(base_size = 12) +
@@ -289,7 +288,7 @@ tree.cor.df <- tree.df %>%
          pigl = ifelse(is.na(pigl),0,pigl),
          pima = ifelse(is.na(pima),0,pima),
          potr = ifelse(is.na(potr),0,potr)) %>%
-  mutate(all = rowSums(.[c('bepa','lala','pigl','pima','potr')])) 
+  mutate(tree.count = rowSums(.[c('bepa','lala','pigl','pima','potr')])) 
 
 # Use GOA mean from 1550-2010 to standardize both climate datasets. 
 goa.1900 <- goa.df %>%
@@ -328,7 +327,7 @@ combined.1550_1895.df <- composite.df %>%
   inner_join(., pctBurned, by = 'ageCE') %>%
   inner_join(., goa.1550, by = 'ageCE') %>%
   left_join(., tree.cor.df, by = 'ageCE') %>%
-  select(lowMean, highMean, win.pct, bin.temp, all)
+  select(lowMean, highMean, win.pct, bin.temp, tree.count)
 
 # Created combined dataframe of standardized, binned proxies for 1900-2005
 goa.1900 <- goa.binned %>%
@@ -345,21 +344,18 @@ combined.1900_2010.df <- composite.df %>%
   inner_join(., cru.combined, by = 'ageCE') %>%
   inner_join(., goa.1900, by = 'ageCE') %>%
   left_join(., tree.cor.df, by = 'ageCE') %>%
-  select(lowMean, highMean, win.pct, cru.precip = precip, cru.temp = temp, goa.temp = bin.temp, all)
-
-
-
+  select(lowMean, highMean, win.pct, cru.precip = precip, cru.temp = temp, goa.temp = bin.temp, tree.count)
 ```
 
-Calculate correlation among fire, tree, and climate records.
+Calculate Spearman rank correlation among fire, tree, and climate records.
 ```{r}
-corr.1550_1895.df <- rcorr(as.matrix(combined.1550_1895.df), type="spearman") 
-corr.1900_2010.df <- rcorr(as.matrix(combined.1900_2010.df), type="spearman") 
+corr.1550_1895.df <- rcorr(as.matrix(combined.1550_1895.df), type="pearson") 
+corr.1900_2010.df <- rcorr(as.matrix(combined.1900_2010.df), type="pearson") 
 
 ```
 
 Correlation coefficients and p-values for period 1550-1895 CE.
-```{r results = 'asis'}
+```{r results = 'asis', echo = FALSE}
 kable(
   corr.1550_1895.df$r,
   caption = 'R'
@@ -373,7 +369,7 @@ kable(
 
 
 Correlation coefficients and p-values for period 1900-2010 CE.
-```{r}
+```{r results = 'asis', echo = FALSE}
 kable(
   corr.1900_2010.df$r,
   caption = 'R'
@@ -387,18 +383,33 @@ kable(
 
 
 Plot scatterplots of linear relationships between temperature and fire proxies for the two periods. 
-```{r}
+```{r results = 'asis', echo = FALSE}
+rp_label <- function(r,p){
+  r.input = r; p.input = p
+  text = substitute(italic(R)^2~"="~r.input*","~~italic(p)~"="~p.input,
+                    list(r.input = format(r, digits = 2),
+                         p.input = format(p, digits = 2)))
+  as.character(as.expression(text))                 
+}
+
+r.text = corr.1550_1895.df$r['lowMean','bin.temp'] * corr.1550_1895.df$r['lowMean','bin.temp']
+p.text = corr.1550_1895.df$P['lowMean','bin.temp']
+
 ggplot(combined.1550_1895.df, aes(x = lowMean, y = bin.temp)) +
   geom_point(size = 3, color = 'black', fill = 'grey50', shape = 21) +
-  #geom_smooth(method = 'lm', se = F, color = 'black', size = 2) +
   theme_bw(base_size = 12) +
+  geom_text(aes(x = .9, y = 7.8), label = rp_label(r.text,p.text), parse = T) +
   labs(x = '50-yr mean biomass burning', y = 'Reconstructed growing season temp.', title = '1550-1895') 
-  
+
+r.text = corr.1900_2010.df$r['lowMean','cru.temp'] * corr.1900_2010.df$r['lowMean','cru.temp']
+p.text = corr.1900_2010.df$P['lowMean','cru.temp']
+
 ggplot(combined.1900_2010.df, aes(x = lowMean, y = cru.temp)) +
   geom_point(size = 3, color = 'black', fill = 'grey50', shape = 21) +
   geom_smooth(method = 'lm', se = F, color = 'black', size = 1) +
+  geom_text(aes(x = 1, y = 5.5), label = rp_label(r.text,p.text), parse = T) +
   theme_bw(base_size = 12) +
-  labs(x = '50-yr mean biomass burning', y = 'Modeled summer temp.',title = '1900-2015')
+  labs(x = '50-yr mean biomass burning', y = 'Modeled growing season temp.',title = '1900-2015')
 ```
 
 
