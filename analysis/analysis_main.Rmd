@@ -11,6 +11,7 @@ knitr::opts_chunk$set(echo = TRUE, results  = 'hide', message = FALSE, warning =
 
 Load the requisite packages.
 ```{r}
+library(tidyr) # For data manipulation
 library(dplyr) # For data manipulation
 library(zoo) # For rolling statistics 
 library(Hmisc) # For correlation statistics
@@ -63,38 +64,11 @@ Load modeled and proxy climate data, bin into 5-year means.
 ```{r}
 goa.df <- read.csv(paste0(dataDir,'climateData_GOA.csv'))
 cru.df <- read.csv(paste0(dataDir,'climateData_CRU.csv'))
-
-# Use GOA mean from 1550-2010 to standardize both climate datasets. 
-goa.1900 <- goa.df %>%
-  filter(yearCE >= 1900) 
-goa.mean <- mean(goa.1900$temp)
-
-# Bin data into universal 5-year means
-goa.df$yearBins <- cut(goa.df$yearCE,include.lowest = T,right = F,
-                       breaks = seq(min(goa.df$yearCE),max(goa.df$yearCE),5), 
-                       labels = seq(min(goa.df$yearCE),2005,5))
-goa.binned <- goa.df %>%
-  group_by(yearBins) %>%
-  summarise(bin.temp = mean(temp)) %>%
-  mutate(zscore = (bin.temp - goa.mean)) %>%
-  mutate(sign = ifelse(zscore >= 0,'positive','negative'))
-
-# Extract June, July, August temperatures from CRU data
-cru.df.jja <- cru.df %>%
+# Extract growing season temperatures from CRU data
+cru.gs.df <- cru.df %>%
   filter(month == 2|month ==3|month ==4|month ==5|month == 6|month == 7|month == 8) %>%
   group_by(yearCE,variable) %>%
   summarise(mean = mean(value))
-
-# Bin data into universal 5-year means
-cru.df.jja$yearBins <- cut(cru.df.jja$yearCE,include.lowest = T,right = F,
-                           breaks = seq(1900,2010,5), 
-                           labels = seq(1900,2005,5))
-cru.binned <- cru.df.jja %>%
-  group_by(yearBins,variable) %>%
-  summarise(bin.mean = mean(mean)) %>%
-  group_by(variable) %>%
-  mutate(zscore = (bin.mean - mean(bin.mean))) %>%
-  mutate(sign = ifelse(zscore >= 0,'positive','negative'))
 ```
 
 
@@ -105,7 +79,7 @@ Mean signal to noise indices of records during study period:
 kable(
   char.df %>% 
     summarise(meanSNI = mean(SNI, na.rm = T)),
-  caption = 'Mean SNI',
+  caption = 'Mean SNI'
 )
 ```
 
@@ -124,7 +98,7 @@ kable(
               mean = mean(FRI, na.rm = T),
               median = median(FRI, na.rm = T),
               sd = sd(FRI, na.rm = T)),
-  caption = 'Study-wide mean FRI',
+  caption = 'Study-wide mean FRI'
 )
 ```
 
@@ -138,7 +112,7 @@ kable(
             sdFRI = sd(FRI, na.rm = T),
             length = length[1],
             FF = nFires/length * 100) ,
-  caption = 'Mean FRI',
+  caption = 'Mean FRI'
 )
 ```
 
@@ -154,7 +128,7 @@ kable(
   summarise(observed = obsCE[1],
             lastPeak = max(peakYr, na.rm = T),
             difference = abs(obsCE[1] - max(peakYr, na.rm = T))),
-  caption = 'Inferred vs. observed fire event timing.',
+  caption = 'Inferred vs. observed fire event timing.'
 )
 ```
 
@@ -302,7 +276,7 @@ ggplot(tree.df, aes(x = pith)) + theme_bw(base_size = 12) +
 
 
 ## Compare proxies
-Calculate correlation among fire, tree, and GOA climate records.
+Standardize and bin data to allow for direct comparison.
 ```{r}
 # Modify tree dataframe 
 tree.cor.df <- tree.df %>%
@@ -317,39 +291,115 @@ tree.cor.df <- tree.df %>%
          potr = ifelse(is.na(potr),0,potr)) %>%
   mutate(all = rowSums(.[c('bepa','lala','pigl','pima','potr')])) 
 
-# Modify GOA climate dataframe
-goa.temp <- goa.binned %>%
+# Use GOA mean from 1550-2010 to standardize both climate datasets. 
+goa.1900 <- goa.df %>%
+  filter(yearCE >= 1900) 
+goa.mean <- mean(goa.1900$temp)
+
+# Bin data into universal 5-year means
+goa.df$yearBins <- cut(goa.df$yearCE,include.lowest = T,right = F,
+                       breaks = seq(min(goa.df$yearCE),max(goa.df$yearCE),5), 
+                       labels = seq(min(goa.df$yearCE),2005,5))
+goa.binned <- goa.df %>%
+  group_by(yearBins) %>%
+  summarise(bin.temp = mean(temp)) %>%
+  mutate(zscore = (bin.temp - goa.mean)) %>%
+  mutate(sign = ifelse(zscore >= 0,'positive','negative'))
+
+
+cru.gs.df$yearBins <- cut(cru.gs.df$yearCE,include.lowest = T,right = F,
+                           breaks = seq(1900,2010,5), 
+                           labels = seq(1900,2005,5))
+cru.binned <- cru.gs.df %>%
+  group_by(yearBins,variable) %>%
+  summarise(bin.mean = mean(mean)) %>%
+  group_by(variable) %>%
+  mutate(zscore = (bin.mean - mean(bin.mean))) %>%
+  mutate(sign = ifelse(zscore >= 0,'positive','negative'))
+
+# Created combined dataframe of standardized, binned proxies for 1550-1895
+goa.1550 <- goa.binned %>%
   mutate(ageCE = as.numeric(as.character(.$yearBins))) %>%
   select(-sign,-yearBins) %>%
   filter(ageCE < 1900)
 
-combined.GOA.df <- composite.df %>%
+combined.1550_1895.df <- composite.df %>%
   select(ageCE, lowMean, highMean) %>%
   inner_join(., pctBurned, by = 'ageCE') %>%
-  inner_join(., goa.temp, by = 'ageCE') %>%
+  inner_join(., goa.1550, by = 'ageCE') %>%
   left_join(., tree.cor.df, by = 'ageCE') %>%
   select(lowMean, highMean, win.pct, bin.temp, all)
 
-corr.goa.df <- rcorr(as.matrix(combined.GOA.df), type="spearman") 
+# Created combined dataframe of standardized, binned proxies for 1900-2005
+goa.1900 <- goa.binned %>%
+  mutate(ageCE = as.numeric(as.character(.$yearBins))) %>%
+  select(-sign,-yearBins) 
+
+cru.combined <- cru.binned %>%
+  mutate(ageCE = as.numeric(as.character(yearBins))) %>%
+  select(ageCE,variable,bin.mean) %>%
+  spread(key = variable, value = bin.mean)
+
+combined.1900_2010.df <- composite.df %>%
+  inner_join(., pctBurned, by = 'ageCE') %>%
+  inner_join(., cru.combined, by = 'ageCE') %>%
+  inner_join(., goa.1900, by = 'ageCE') %>%
+  left_join(., tree.cor.df, by = 'ageCE') %>%
+  select(lowMean, highMean, win.pct, cru.precip = precip, cru.temp = temp, goa.temp = bin.temp, all)
+
+
+
 ```
 
+Calculate correlation among fire, tree, and climate records.
+```{r}
+corr.1550_1895.df <- rcorr(as.matrix(combined.1550_1895.df), type="spearman") 
+corr.1900_2010.df <- rcorr(as.matrix(combined.1900_2010.df), type="spearman") 
 
-View correlation coefficients and p-values.
+```
+
+Correlation coefficients and p-values for period 1550-1895 CE.
 ```{r results = 'asis'}
 kable(
-  corr.goa.df$r,
-  caption = 'R',
+  corr.1550_1895.df$r,
+  caption = 'R'
 )
 
 kable(
-  corr.goa.df$P,
-  caption = 'P-Value',
+  corr.1550_1895.df$P,
+  caption = 'P-Value'
 )
 ```
 
-Calculate correlation among fire, tree and CRU climate records.
+
+Correlation coefficients and p-values for period 1900-2010 CE.
+```{r}
+kable(
+  corr.1900_2010.df$r,
+  caption = 'R'
+)
+
+kable(
+  corr.1900_2010.df$P,
+  caption = 'P-Value'
+)
+```
 
 
+Plot scatterplots of linear relationships between temperature and fire proxies for the two periods. 
+```{r}
+ggplot(combined.1550_1895.df, aes(x = lowMean, y = bin.temp)) +
+  geom_point(size = 3, color = 'black', fill = 'grey50', shape = 21) +
+  #geom_smooth(method = 'lm', se = F, color = 'black', size = 2) +
+  theme_bw(base_size = 12) +
+  labs(x = '50-yr mean biomass burning', y = 'Reconstructed growing season temp.', title = '1550-1895') 
+  
+ggplot(combined.1900_2010.df, aes(x = lowMean, y = cru.temp)) +
+  geom_point(size = 3, color = 'black', fill = 'grey50', shape = 21) +
+  geom_smooth(method = 'lm', se = F, color = 'black', size = 1) +
+  theme_bw(base_size = 12) +
+  labs(x = '50-yr mean biomass burning', y = 'Modeled summer temp.',title = '1900-2015')
+```
 
 
 
