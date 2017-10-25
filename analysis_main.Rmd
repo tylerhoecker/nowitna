@@ -131,6 +131,16 @@ kable(
 )
 ```
 
+Plot lake-specific CHAR records (black line), inferred fire events (black dots), and theshold used to define events (grey line).
+```{r results = 'asis', echo = FALSE}
+ggplot(char.df, aes(x=ageCE, y=charAcc)) + theme_bw() +
+  geom_step() +
+  geom_line(aes(y = (treshPos+charBkg)), color = 'grey50') +
+  geom_point(aes(x = peakYr, y = 0), shape = 21, size = 1.5, fill = 'black') +
+  labs(y = bquote('Charcoal accumulation rate ('*pieces %.% cm^-2 %.% yr^-1*')'),
+       x= 'Time (year CE)') +
+  facet_wrap(~lake, scales = 'free', ncol = 2)
+```
 
 
 
@@ -235,7 +245,7 @@ source(file = file.path("analysis_composite.R"))
 ```
 
 Plot the result, a composite record of biomass burning.
-```{r echo = FALSE}
+```{r results = 'asis', echo = FALSE}
 ggplot(composite.df, aes(x=ageCE)) +
   geom_col(aes(y = highMean), fill = 'grey50', width = 5) +
   geom_ribbon(aes(ymin = lowCIlower, ymax = lowCIupper), alpha = 0.2) +
@@ -259,7 +269,7 @@ tree.df %>%
 ```
 
 Plot the result, a time series of estimated pith dates by species.
-```{r echo = FALSE}
+```{r results = 'asis', echo = FALSE}
 speciesColors <- c("#E69F00", "#D55E00", "#4286f4","#009E73","#E69F00")
 
 ggplot(tree.df, aes(x = pith)) + theme_bw(base_size = 12) +
@@ -346,6 +356,24 @@ combined.1900_2010.df <- composite.df %>%
   left_join(., tree.cor.df, by = 'ageCE') %>%
   select(lowMean, highMean, win.pct, cru.precip = precip, cru.temp = temp, goa.temp = bin.temp, tree.count)
 ```
+
+Plot standardized climate data.
+```{r results = 'asis', echo = FALSE}
+ggplot(goa.binned, 
+         aes(x= as.numeric(as.character(yearBins)), y = zscore)) + theme_bw(base_size = 12) +
+  geom_col(data = filter(cru.binned,variable == 'temp'), 
+           aes(fill = sign, x= as.numeric(as.character(yearBins)), y = zscore)) +
+  geom_step(aes(x= as.numeric(as.character(yearBins)) -1),direction = 'hv') +
+  scale_fill_manual(values = c('negative' = 'dodgerblue4','positive'='red3')) +
+  ylab('Growing season temp.\nanomaly (deg. C)') +
+  scale_y_continuous(sec.axis = dup_axis(name = 'Modeled growing season temp.\nanomaly (deg.C)')) +
+  scale_x_continuous(limits = studyPeriod, breaks = seq(studyPeriod[1],studyPeriod[2],50),
+                     labels = c('',1600,'',1700,'',1800,'',1900,'',2000)) +
+  xlab("Year CE") 
+```
+
+
+
 
 Calculate Spearman rank correlation among fire, tree, and climate records.
 ```{r}
