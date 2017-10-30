@@ -30,7 +30,43 @@ lakes <- c('BB15','DU15','MA15','NW15','SH15','TL15','UR15')
 studyPeriod <- c(1550,2015)
 ```
 
-Load charcoal data (data should be stored in the same directory as 'analysis.Rmd'). These data have already undergone peak analysis and interpolation in CharAnalysis (https://github.com/phiguera/CharAnalysis). 
+Load chronological data. Age-depth models were built in Bacon v2.2 (http://www.chrono.qub.ac.uk/blaauw/bacon.html), using the parameters described in the text (Table 2).  
+```{r}
+dates <- read.csv(paste0(dataDir,'/ageData_sample_inventory.csv'))
+
+ageModel.df <- lapply(paste0(dataDir,'ageModel_',lakes,'.csv'), read.csv) %>% 
+  `names<-` (lakes) %>%
+  bind_rows(.id = 'lake')
+```
+
+Plot age-depth models.
+```{r results = 'asis', echo = FALSE}
+ggplot(ageModel.df, aes(x = depth)) + theme_bw(base_size = 12) +
+  geom_line(aes(y = median)) +
+  geom_ribbon(aes(ymin = min, ymax = max), alpha = 0.3) +
+  geom_point(data = dates, aes(x = TopDepth, y = CalibratedAge, shape = Type)) + #color = factor(Used)
+  geom_errorbar(data = dates, 
+                aes(x = TopDepth, ymin = CalAgeLCI, ymax = CalAgeUCI)) +
+  geom_vline(data = dates, aes(xintercept = Conf), linetype = 2, color = 'grey20') +
+  scale_shape_discrete('Sample\nType', breaks = c('C14','Pb210'), 
+                       labels = c(as.expression(bquote(''^14~C)),
+                                  as.expression(bquote(''^210~Pb)))) +
+  #scale_colour_grey('',start = .5, end = 0) +
+  scale_x_reverse() +
+  scale_y_continuous(trans = 'reverse', sec.axis = sec_axis(~1950-., name = 'Median estimated age (Year CE)')) +
+  coord_cartesian(ylim = c(-65,625)) +
+  facet_wrap(~lake, ncol = 4, scales = 'free') +  #, scales = 'free'
+  labs(x = 'Sample depth (cm)', y = 'Median estimated age (cal yr BP)') +
+  theme(panel.grid.minor = element_blank(),
+        legend.position = c(0.9, 0.25), # c(0,0) bottom left, c(1,1) top-right.
+        legend.background = element_rect(fill = "#ffffffaa", colour = "black"))
+
+
+```
+
+
+
+Load charcoal data. These data have undergone peak analysis and interpolation in CharAnalysis (https://github.com/phiguera/CharAnalysis), using the parameters described in the text (Table 2).
 ```{r}
 char.ldf <- lapply(paste0(dataDir,'charResults_',lakes,'.csv'),read.csv)   
 
