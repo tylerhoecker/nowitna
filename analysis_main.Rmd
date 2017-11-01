@@ -41,7 +41,7 @@ ageModel.df <- lapply(paste0(dataDir,'ageModel_',lakes,'.csv'), read.csv) %>%
 
 Plot age-depth models.
 ```{r results = 'asis', echo = FALSE}
-ggplot(ageModel.df, aes(x = depth)) + theme_bw(base_size = 12) +
+ggplot(ageModel.df, aes(x = depth)) + 
   geom_line(aes(y = median)) +
   geom_ribbon(aes(ymin = min, ymax = max), alpha = 0.3) +
   geom_point(data = dates, aes(x = TopDepth, y = CalibratedAge, shape = Type)) + #color = factor(Used)
@@ -51,19 +51,16 @@ ggplot(ageModel.df, aes(x = depth)) + theme_bw(base_size = 12) +
   scale_shape_discrete('Sample\nType', breaks = c('C14','Pb210'), 
                        labels = c(as.expression(bquote(''^14~C)),
                                   as.expression(bquote(''^210~Pb)))) +
-  #scale_colour_grey('',start = .5, end = 0) +
   scale_x_reverse() +
   scale_y_continuous(trans = 'reverse', sec.axis = sec_axis(~1950-., name = 'Median estimated age (Year CE)')) +
   coord_cartesian(ylim = c(-65,625)) +
   facet_wrap(~lake, ncol = 4, scales = 'free') +  #, scales = 'free'
   labs(x = 'Sample depth (cm)', y = 'Median estimated age (cal yr BP)') +
+  theme_bw(base_size = 12) +
   theme(panel.grid.minor = element_blank(),
         legend.position = c(0.9, 0.25), # c(0,0) bottom left, c(1,1) top-right.
         legend.background = element_rect(fill = "#ffffffaa", colour = "black"))
-
-
 ```
-
 
 
 Load charcoal data. These data have undergone peak analysis and interpolation in CharAnalysis (https://github.com/phiguera/CharAnalysis), using the parameters described in the text (Table 2).
@@ -101,7 +98,7 @@ goa.df <- read.csv(paste0(dataDir,'climateData_GOA.csv'))
 cru.df <- read.csv(paste0(dataDir,'climateData_CRU.csv'))
 # Extract growing season temperatures from CRU data
 cru.gs.df <- cru.df %>%
-  filter(month == 2|month ==3|month ==4|month ==5|month == 6|month == 7|month == 8) %>%
+  filter(month %in% c(4:9)) %>%
   group_by(yearCE,variable) %>%
   summarise(mean = mean(value))
 ```
@@ -471,7 +468,7 @@ p.text = corr.1900_2010.df$P['lowMean','cru.temp']
 ggplot(combined.1900_2010.df, aes(x = lowMean, y = cru.temp)) +
   geom_point(size = 3, color = 'black', fill = 'grey50', shape = 21) +
   geom_smooth(method = 'lm', se = F, color = 'black', size = 1) +
-  geom_text(aes(x = 1, y = 5.5), label = rp_label(r.text,p.text), parse = T) +
+  geom_text(aes(x = 1, y = 11.5), label = rp_label(r.text,p.text), parse = T) +
   theme_bw(base_size = 12) +
   labs(x = '50-yr mean biomass burning', y = 'Modeled growing season temp.',title = '1900-2015')
 ```
