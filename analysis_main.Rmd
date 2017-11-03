@@ -54,11 +54,11 @@ ggplot(ageModel.df, aes(x = depth)) +
   scale_x_reverse() +
   scale_y_continuous(trans = 'reverse', sec.axis = sec_axis(~1950-., name = 'Median estimated age (Year CE)')) +
   coord_cartesian(ylim = c(-65,625)) +
-  facet_wrap(~lake, ncol = 4, scales = 'free') +  #, scales = 'free'
+  facet_wrap(~lake, ncol = 2, scales = 'free') +  #, scales = 'free'
   labs(x = 'Sample depth (cm)', y = 'Median estimated age (cal yr BP)') +
   theme_bw(base_size = 12) +
   theme(panel.grid.minor = element_blank(),
-        legend.position = c(0.9, 0.25), # c(0,0) bottom left, c(1,1) top-right.
+        legend.position = c(0.9, 0.1), # c(0,0) bottom left, c(1,1) top-right.
         legend.background = element_rect(fill = "#ffffffaa", colour = "black"))
 ```
 
