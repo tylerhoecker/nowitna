@@ -1,6 +1,9 @@
 ---
-title: "Analysis for Hoecker and Higuera XXXX: "
-output: html_document
+title: 'Analysis for Hoecker and Higuera XXXX: '
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -11,11 +14,9 @@ knitr::opts_chunk$set(echo = TRUE, results  = 'hide', message = FALSE, warning =
 
 Load the requisite packages.
 ```{r}
-library(tidyr) # For data manipulation
-library(dplyr) # For data manipulation
+library(tidyverse) # For data manipulation and plotting
 library(zoo) # For rolling statistics 
 library(Hmisc) # For correlation statistics
-library(ggplot2) # For plotting
 library(knitr) # For formatting this file 
 ```
 
@@ -32,9 +33,9 @@ studyPeriod <- c(1550,2015)
 
 Load chronological data. Age-depth models were built in Bacon v2.2 (http://www.chrono.qub.ac.uk/blaauw/bacon.html), using the parameters described in the text (Table 2).  
 ```{r}
-dates <- read.csv(paste0(dataDir,'/ageData_sample_inventory.csv'))
+dates <- read_csv(paste0(dataDir,'/ageData_sample_inventory.csv'))
 
-ageModel.df <- lapply(paste0(dataDir,'ageModel_',lakes,'.csv'), read.csv) %>% 
+ageModel.df <- map(paste0(dataDir,'ageModel_',lakes,'.csv'), read_csv) %>% 
   `names<-` (lakes) %>%
   bind_rows(.id = 'lake')
 ```
@@ -52,9 +53,10 @@ ggplot(ageModel.df, aes(x = depth)) +
                        labels = c(as.expression(bquote(''^14~C)),
                                   as.expression(bquote(''^210~Pb)))) +
   scale_x_reverse() +
-  scale_y_continuous(trans = 'reverse', sec.axis = sec_axis(~1950-., name = 'Median estimated age (Year CE)')) +
-  coord_cartesian(ylim = c(-65,625)) +
-  facet_wrap(~lake, ncol = 2, scales = 'free') +  #, scales = 'free'
+  scale_y_continuous(trans = 'reverse', 
+                     sec.axis = sec_axis(~1950-., name = 'Median estimated age (Year CE)')) +
+  coord_cartesian(ylim = c(-65,650)) +
+  facet_wrap(~lake, ncol = 4) +  #, scales = 'free'
   labs(x = 'Sample depth (cm)', y = 'Median estimated age (cal yr BP)') +
   theme_bw(base_size = 12) +
   theme(panel.grid.minor = element_blank(),
@@ -65,7 +67,7 @@ ggplot(ageModel.df, aes(x = depth)) +
 
 Load charcoal data. These data have undergone peak analysis and interpolation in CharAnalysis (https://github.com/phiguera/CharAnalysis), using the parameters described in the text (Table 2).
 ```{r}
-char.ldf <- lapply(paste0(dataDir,'charResults_',lakes,'.csv'),read.csv)   
+char.ldf <- map(paste0(dataDir,'charResults_',lakes,'.csv'),read_csv)   
 
 char.df <- char.ldf %>%
   bind_rows() %>%
@@ -82,20 +84,20 @@ char.df <- char.ldf %>%
 
 Load observed (historic) fire event data.
 ```{r}
-observed.df <- read.csv(paste0(dataDir,'/observedfireData.csv'))
+observed.df <- read_csv(paste0(dataDir,'/observedfireData.csv'))
 obs.1km <- filter(observed.df,distance == 1.0) %>%
   rename(obsCE = ageCE)
 ```
 
 Load tree demography data.
 ```{r}
-tree.df <- read.csv(paste0(dataDir,'treeData.csv'))
+tree.df <- read_csv(paste0(dataDir,'treeData.csv'))
 ```
 
 Load modeled and proxy climate data, bin into 5-year means.
 ```{r}
-goa.df <- read.csv(paste0(dataDir,'climateData_GOA.csv'))
-cru.df <- read.csv(paste0(dataDir,'climateData_CRU.csv'))
+goa.df <- read_csv(paste0(dataDir,'climateData_GOA.csv'))
+cru.df <- read_csv(paste0(dataDir,'climateData_CRU.csv'))
 # Extract growing season temperatures from CRU data
 cru.gs.df <- cru.df %>%
   filter(month %in% c(4:9)) %>%
@@ -235,12 +237,31 @@ Plot the result, a time series of FRI (grey squares), percent sites burned based
 ## Build composite biomass burning recrod from individual records. 
 Import raw charcoal count data.
 ```{r}
-# Import selected regions / alaska 
-dataframes <- lapply(paste0(dataDir,'charData_',lakes,'.csv'),read.csv) 
+
+transFunc <- function(x) {
+  x = ifelse(x > 0, x, NA)
+  logX = log(x)
+  zX = logX - mean(logX, na.rm = T) / sd(logX, na.rm = T)
+  expX = exp(zX, na.rm = T)
+  expX[is.na(expX)] = 0
+  return(expX)
+}
+
+charData <- map(paste0(dataDir,'charData_',lakes,'.csv'),read_csv) %>%
+  `names<-` (lakes) %>%
+  bind_rows(.id = 'lake') %>% 
+  group_by(lake) %>% 
+  mutate(sedAcc = (cmTop - cmBot) / (ageTop - ageBot),
+         rawChar = (charCount / charVol) * sedAcc,
+         char = transFunc(rawChar)) %>% 
+  rowwise() %>% 
+  mutate(age = mean(c(ageTop,ageBot))) %>% 
+  select(char, age, lake)
+
 ```
 Derive and standardize charcoal accumulation rates (# cm2 yr-1, "CHAR").
 ```{r}
-# Calculate and standardize CHAR 
+# Calculate and standardize CHAR
 for (i in 1:length(lakes)){
   # Calculate sediment accumulation rates (dataframes[[i]]$sedAcc) [cm/yr] 
   dataframes[[i]][,'sedAcc'] <- 
@@ -265,7 +286,11 @@ for (i in 1:length(lakes)){
 }
 
 # Turn multiple dataframes into one long data frame
-dat <- do.call(rbind,lapply(dataframes,data.frame,stringsAsFactors=TRUE))
+dat <- dat %>% 
+  bind_rows() %>%
+  select(char,age,lake)
+  
+  do.call(rbind,lapply(dataframes,data.frame,stringsAsFactors=TRUE))
 dat <- dat[,c('char','age','lake')]
 ```
 
