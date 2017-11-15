@@ -235,18 +235,19 @@ Plot the result, a time series of FRI (grey squares), percent sites burned based
 
 
 ## Build composite biomass burning recrod from individual records. 
-Import raw charcoal count data.
-```{r}
 
+Import raw charcoal count data; derive and standardize charcoal accumulation rates (# cm2 yr-1, "CHAR").
+```{r}
+# Function for standardizing non-zero charcoal accumlations rates
 transFunc <- function(x) {
   x = ifelse(x > 0, x, NA)
   logX = log(x)
-  zX = logX - mean(logX, na.rm = T) / sd(logX, na.rm = T)
-  expX = exp(zX, na.rm = T)
+  zX = (logX - mean(logX, na.rm = T)) / sd(logX, na.rm = T)
+  expX = exp(zX)
   expX[is.na(expX)] = 0
   return(expX)
 }
-
+# Calculate and standardize CHAR
 charData <- map(paste0(dataDir,'charData_',lakes,'.csv'),read_csv) %>%
   `names<-` (lakes) %>%
   bind_rows(.id = 'lake') %>% 
@@ -255,49 +256,13 @@ charData <- map(paste0(dataDir,'charData_',lakes,'.csv'),read_csv) %>%
          rawChar = (charCount / charVol) * sedAcc,
          char = transFunc(rawChar)) %>% 
   rowwise() %>% 
-  mutate(age = mean(c(ageTop,ageBot))) %>% 
+  mutate(age = round(mean(c(ageTop,ageBot)))) %>% 
   select(char, age, lake)
-
-```
-Derive and standardize charcoal accumulation rates (# cm2 yr-1, "CHAR").
-```{r}
-# Calculate and standardize CHAR
-for (i in 1:length(lakes)){
-  # Calculate sediment accumulation rates (dataframes[[i]]$sedAcc) [cm/yr] 
-  dataframes[[i]][,'sedAcc'] <- 
-    (dataframes[[i]][,'cmTop']-dataframes[[i]][,'cmBot'])/
-    (dataframes[[i]][,'ageTop']-dataframes[[i]][,'ageBot']) 
-  # Calculate charcoal accumulation rates (dataframes[[i]]$char) [#/cm2/yr]
-  dataframes[[i]][,'char'] <- 
-    (dataframes[[i]][,'charCount']/dataframes[[i]][,'charVol'])*
-    dataframes[[i]][,'sedAcc'] 
-  # Log transform non-zero char
-  nonZero <- which(dataframes[[i]][,'char'] > 0)
-  transChar <- log(dataframes[[i]][nonZero,'char'])
-  # Z-score transformed char
-  zChar <- (transChar - mean(transChar, na.rm=T)) / sd(transChar, na.rm = T)
-  # Exponentiate
-  dataframes[[i]][nonZero,'char'] <- exp(zChar)
-  # Average sample age (this added to work with RK scripts)
-  dataframes[[i]][,'age'] <- 
-    round(rowMeans(dataframes[[i]][,c('ageTop','ageBot')], na.rm = T))
-  # Site/lake name
-  dataframes[[i]][,'lake'] <- lakes[i]
-}
-
-# Turn multiple dataframes into one long data frame
-dat <- dat %>% 
-  bind_rows() %>%
-  select(char,age,lake)
-  
-  do.call(rbind,lapply(dataframes,data.frame,stringsAsFactors=TRUE))
-dat <- dat[,c('char','age','lake')]
 ```
 
-Execute the method for building a composite biomass burning record used in Kelly et al. 2013 (10.1073/pnas.1305069110). The method estimates the parameters of a zero-inflated log-normal (ZIL) distribution of pooled charcoal counts in continuous moving windows of a user-defined width. In this analysis, 5-year and 50-year window widths are used (2.5 and 25 half-kernel widths, respectively).
+Execute the method for building a composite biomass burning record used in Kelly et al. 2013 (doi: 10.1073/pnas.1305069110). The method estimates the parameters of a zero-inflated log-normal (ZIL) distribution of pooled charcoal counts in continuous moving windows of a user-defined width. In this analysis, 5-year and 50-year window widths are used (2.5 and 25 half-kernel widths, respectively).
 
 This portion of the analysis is relegated to a separate R script for clarity of the workflow. Window widths and other parameters can be manipulated within the 'analysis_composite.r' script.
-
 ```{r message=FALSE}
 source(file = file.path("analysis_composite.R"))
 ```
