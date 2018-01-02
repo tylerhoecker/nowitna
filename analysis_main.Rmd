@@ -1,9 +1,6 @@
 ---
-title: 'Analysis for Hoecker and Higuera XXXX: '
-output:
-  pdf_document: default
-  html_document: default
-  word_document: default
+title: 'Analysis for Hoecker and Higuera 2018: '
+output: html_document 
 ---
 
 ```{r setup, include=FALSE}
@@ -12,7 +9,7 @@ knitr::opts_chunk$set(echo = TRUE, results  = 'hide', message = FALSE, warning =
 
 ## Setup
 
-Load the requisite packages.
+#### Load the requisite packages
 ```{r}
 library(tidyverse) # For data manipulation and plotting
 library(zoo) # For rolling statistics 
@@ -20,25 +17,13 @@ library(Hmisc) # For correlation statistics
 library(knitr) # For formatting this file 
 ```
 
-Specify directory on your machine containing data (ends with 'nowitna/data') 
-```{r}
-dataDir <- "/Users/tylerhoecker/GitHub/nowitna/data/"
+#### Load data from Rdata file
+``` {r}
+load('complete_data.Rdata')
 ```
+To load and/or compile proxies individually, run "load_indv_data.R" before proceeding.
 
-Specify lakes and time period of analysis.
-```{r}
-lakes <- c('BB15','DU15','MA15','NW15','SH15','TL15','UR15') 
-studyPeriod <- c(1550,2015)
-```
-
-Load chronological data. Age-depth models were built in Bacon v2.2 (http://www.chrono.qub.ac.uk/blaauw/bacon.html), using the parameters described in the text (Table 2).  
-```{r}
-dates <- read_csv(paste0(dataDir,'/ageData_sample_inventory.csv'))
-
-ageModel.df <- map(paste0(dataDir,'ageModel_',lakes,'.csv'), read_csv) %>% 
-  `names<-` (lakes) %>%
-  bind_rows(.id = 'lake')
-```
+#### Visualize all proxies
 
 Plot age-depth models.
 ```{r results = 'asis', echo = FALSE}
@@ -64,49 +49,64 @@ ggplot(ageModel.df, aes(x = depth)) +
         legend.background = element_rect(fill = "#ffffffaa", colour = "black"))
 ```
 
-
-Load charcoal data. These data have undergone peak analysis and interpolation in CharAnalysis (https://github.com/phiguera/CharAnalysis), using the parameters described in the text (Table 2).
-```{r}
-char.ldf <- map(paste0(dataDir,'charResults_',lakes,'.csv'),read_csv)   
-
-char.df <- char.ldf %>%
-  bind_rows() %>%
-  mutate(ageCE = 1950 - ageTop,
-         peakYr = ifelse(peaksFinal == 1,ageCE,NA),
-         peakInsigYr = ifelse(peaksInsig == 1,ageCE,NA),
-         peakYr1 = ifelse(peaks1 == 1,ageCE,NA),
-         peakYr2 = ifelse(peaks2 == 1,ageCE,NA),
-         peakYr3 = ifelse(peaks3 == 1,ageCE,NA)) %>%
-  filter(ageCE >= studyPeriod[1]) %>%
-  group_by(lake) %>%
-         mutate(length = max(ageCE) - min(ageCE)) 
+Plot lake-specific CHAR records (black line), inferred fire events (black dots), and theshold used to define events (grey line).
+```{r results = 'asis', echo = FALSE}
+ggplot(char.df, aes(x=ageCE, y=charAcc)) + theme_bw() +
+  geom_step() +
+  geom_line(aes(y = (treshPos+charBkg)), color = 'grey50') +
+  geom_point(aes(x = peakYr, y = 0), shape = 21, size = 1.5, fill = 'black') +
+  labs(y = bquote('Charcoal accumulation rate ('*pieces %.% cm^-2 %.% yr^-1*')'),
+       x= 'Time (year CE)') +
+  facet_wrap(~lake, scales = 'free', ncol = 2)
 ```
 
-Load observed (historic) fire event data.
-```{r}
-observed.df <- read_csv(paste0(dataDir,'/observedfireData.csv'))
-obs.1km <- filter(observed.df,distance == 1.0) %>%
-  rename(obsCE = ageCE)
+Plot the composite record of biomass burning.
+```{r results = 'asis', echo = FALSE}
+ggplot(composite.df, aes(x=ageCE)) +
+  geom_col(aes(y = highMean), fill = 'grey50', width = 5) +
+  geom_ribbon(aes(ymin = lowCIlower, ymax = lowCIupper), alpha = 0.2) +
+  geom_line(aes(y = lowMean)) +
+  scale_x_continuous(limits = studyPeriod, 
+                     breaks = seq(studyPeriod[1],studyPeriod[2],50)) +
+  scale_y_continuous(breaks = c(0,1,2,3)) +
+  labs(y = 'Biomass burning\n(standardized CHAR)', 
+       x = 'Year CE') +
+  coord_cartesian(ylim = c(0,3)) +
+  theme_bw(base_size = 14) 
 ```
 
-Load tree demography data.
-```{r}
-tree.df <- read_csv(paste0(dataDir,'treeData.csv'))
+Plot time series of estimated pith dates by species.
+```{r results = 'asis', echo = FALSE}
+speciesColors <- c("#E69F00", "#D55E00", "#4286f4","#009E73","#E69F00")
+
+ggplot(tree.df, aes(x = pith)) + theme_bw(base_size = 12) +
+  geom_histogram(stat = 'bin',
+                 binwidth = 5,
+                 position = 'stack', 
+                 aes(fill = sp)) +
+  scale_fill_manual(values = speciesColors) +
+  scale_x_continuous(limits = studyPeriod, breaks = seq(studyPeriod[1],studyPeriod[2],50)) +
+  scale_y_continuous(breaks = c(0,50,100)) +
+  labs(x = 'Pith date / sample age (C.E.)', y = 'Count', fill = 'Species') 
 ```
 
-Load modeled and proxy climate data, bin into 5-year means.
-```{r}
-goa.df <- read_csv(paste0(dataDir,'climateData_GOA.csv'))
-cru.df <- read_csv(paste0(dataDir,'climateData_CRU.csv'))
-# Extract growing season temperatures from CRU data
-cru.gs.df <- cru.df %>%
-  filter(month %in% c(4:9)) %>%
-  group_by(yearCE,variable) %>%
-  summarise(mean = mean(value))
+Plot standardized climate data.
+```{r results = 'asis', echo = FALSE}
+ggplot(goa.binned, 
+         aes(x= as.numeric(as.character(yearBins)), y = zscore)) + theme_bw(base_size = 12) +
+  geom_col(data = filter(cru.binned,variable == 'temp'), 
+           aes(fill = sign, x= as.numeric(as.character(yearBins)), y = zscore)) +
+  geom_step(aes(x= as.numeric(as.character(yearBins)) -1),direction = 'hv') +
+  scale_fill_manual(values = c('negative' = 'dodgerblue4','positive'='red3')) +
+  ylab('Growing season temp.\nanomaly (deg. C)') +
+  scale_y_continuous(sec.axis = dup_axis(name = 'Modeled growing season temp.\nanomaly (deg.C)')) +
+  scale_x_continuous(limits = studyPeriod, breaks = seq(studyPeriod[1],studyPeriod[2],50),
+                     labels = c('',1600,'',1700,'',1800,'',1900,'',2000)) +
+  xlab("Year CE") 
 ```
 
 
-## Summarize fire event metrics 
+#### Summarize fire event metrics 
 
 Mean signal to noise indices of records during study period:
 ```{r results  = 'asis'}
@@ -117,7 +117,7 @@ kable(
 )
 ```
 
-Study-wide mean FRI (mean of all FRI pooled, rather than mean of means):
+Study-wide mean fire return interval [FRI, years] (mean of all FRI pooled, rather than mean of means):
 ```{r results  = 'asis'}
 FRI <- char.df %>%
   select(lake,peakYr,length) %>%
@@ -150,7 +150,7 @@ kable(
 )
 ```
 
-Calculate the difference (in years) between observed fire years within 1km of lakes and the most recent fire event detected in charcoal record
+Calculate the difference [years] between observed fire years within 1km of lakes and the most recent fire event detected in charcoal record
 ```{r results = 'asis'}
 char.df <- char.df %>%
   group_by(lake) %>%
@@ -166,42 +166,31 @@ kable(
 )
 ```
 
-Plot lake-specific CHAR records (black line), inferred fire events (black dots), and theshold used to define events (grey line).
-```{r results = 'asis', echo = FALSE}
-ggplot(char.df, aes(x=ageCE, y=charAcc)) + theme_bw() +
-  geom_step() +
-  geom_line(aes(y = (treshPos+charBkg)), color = 'grey50') +
-  geom_point(aes(x = peakYr, y = 0), shape = 21, size = 1.5, fill = 'black') +
-  labs(y = bquote('Charcoal accumulation rate ('*pieces %.% cm^-2 %.% yr^-1*')'),
-       x= 'Time (year CE)') +
-  facet_wrap(~lake, scales = 'free', ncol = 2)
-```
+## Analysis
 
-
-
-## Calculate proportion of sites burned through time, using 50-year windows in continuous 5-year time steps.
+#### Calculate proportion of sites burned through time, using 50-year windows in continuous 5-year time steps.
 ```{r}
-window = 50
-timeStep = 5
+window = 50 # years 
+timeStep = 5 # years
 
-sitesByYear <- char.df %>%
+sitesByYear <- char.df %>% # Count the number of sites each year
   group_by(ageCE) %>%
   summarise(sites = n()) 
 
 pctBurned <- char.df %>% 
   filter(!is.na(peakYr)) %>%
   group_by(peakYr) %>%
-  summarise(n.burned = n()) %>%
+  summarise(n.burned = n()) %>% # Sum number of sites burned each year
   rename(ageCE = peakYr) %>%
   full_join(sitesByYear,.) %>%
   mutate(n.burned = ifelse(!is.na(n.burned),n.burned,0)) %>%
-  # Window
+  # Sum number of sites burned in 50-year windows centered at each timeStep
   mutate(win.total = rollapply(sites, window/timeStep, fill= NA,
                                FUN = mean, na.rm =T)) %>%
   mutate(win.burn = rollsum(n.burned, window/timeStep, fill= NA)) %>%
   mutate(win.pct = win.burn/win.total*100) 
 
-
+# Perform same calculation as above for modern period
 modernTime <- seq(1950,2015,1)
 modernSites = data.frame('ageCE' = modernTime, 'sites' = 6)
 
@@ -211,7 +200,7 @@ pctModern <- observed.df %>%
   summarise(n.burned = n()) %>%
   full_join(modernSites,.) %>%
   mutate(n.burned = ifelse(!is.na(n.burned),n.burned,0)) %>%
-  # Window
+  # Sum number of sites burned in 50-year windows centered at each timeStep
   mutate(win.total = rollapply(sites, window, fill= NA,
                                FUN = mean, na.rm =T)) %>%
   mutate(win.burn = rollsum(n.burned, window, fill= NA)) %>%
@@ -225,178 +214,13 @@ Plot the result, a time series of FRI (grey squares), percent sites burned based
   geom_step(direction = 'vh') +
   geom_point(data = FRI, aes(x = peakYr, y = FRI/2), shape = 22, fill = 'grey50', size = 2) +
   scale_x_continuous(limits = studyPeriod, breaks = seq(studyPeriod[1],studyPeriod[2],50)) +
-  scale_y_continuous(limits = c(0,100), sec.axis = sec_axis(trans = ~.*2,name = 'Fire return interval (yr)')) +
+  scale_y_continuous(limits = c(0,100), 
+                     sec.axis = sec_axis(trans = ~.*2,name = 'Fire return interval (yr)')) +
   labs(y = 'Percent of sites burned', x = 'Year CE') +
   theme_bw(base_size = 14)
 ```
 
-
-
-
-
-## Build composite biomass burning recrod from individual records. 
-
-Import raw charcoal count data; derive and standardize charcoal accumulation rates (# cm2 yr-1, "CHAR").
-```{r}
-# Function for standardizing non-zero charcoal accumlations rates
-transFunc <- function(x) {
-  x = ifelse(x > 0, x, NA)
-  logX = log(x)
-  zX = (logX - mean(logX, na.rm = T)) / sd(logX, na.rm = T)
-  expX = exp(zX)
-  expX[is.na(expX)] = 0
-  return(expX)
-}
-# Calculate and standardize CHAR
-charData <- map(paste0(dataDir,'charData_',lakes,'.csv'),read_csv) %>%
-  `names<-` (lakes) %>%
-  bind_rows(.id = 'lake') %>% 
-  group_by(lake) %>% 
-  mutate(sedAcc = (cmTop - cmBot) / (ageTop - ageBot),
-         rawChar = (charCount / charVol) * sedAcc,
-         char = transFunc(rawChar)) %>% 
-  rowwise() %>% 
-  mutate(age = round(mean(c(ageTop,ageBot)))) %>% 
-  select(char, age, lake)
-```
-
-Execute the method for building a composite biomass burning record used in Kelly et al. 2013 (doi: 10.1073/pnas.1305069110). The method estimates the parameters of a zero-inflated log-normal (ZIL) distribution of pooled charcoal counts in continuous moving windows of a user-defined width. In this analysis, 5-year and 50-year window widths are used (2.5 and 25 half-kernel widths, respectively).
-
-This portion of the analysis is relegated to a separate R script for clarity of the workflow. Window widths and other parameters can be manipulated within the 'analysis_composite.r' script.
-```{r message=FALSE}
-source(file = file.path("analysis_composite.R"))
-```
-
-Plot the result, a composite record of biomass burning.
-```{r results = 'asis', echo = FALSE}
-ggplot(composite.df, aes(x=ageCE)) +
-  geom_col(aes(y = highMean), fill = 'grey50', width = 5) +
-  geom_ribbon(aes(ymin = lowCIlower, ymax = lowCIupper), alpha = 0.2) +
-  geom_line(aes(y = lowMean)) +
-  scale_x_continuous(limits = studyPeriod, 
-                     breaks = seq(studyPeriod[1],studyPeriod[2],50)) +
-  scale_y_continuous(breaks = c(0,1,2,3)) +
-  labs(y = 'Biomass burning\n(standardized CHAR)', 
-       x = 'Year CE') +
-  coord_cartesian(ylim = c(0,3)) +
-  theme_bw(base_size = 14) 
-```
-
-
-## Summarize tree demography data.
-```{r}
-tree.df %>%
-  mutate(ageCE = plyr::round_any(pith,5)) %>%
-  group_by(sp) %>%
-  summarise(count = n()) 
-```
-
-Plot the result, a time series of estimated pith dates by species.
-```{r results = 'asis', echo = FALSE}
-speciesColors <- c("#E69F00", "#D55E00", "#4286f4","#009E73","#E69F00")
-
-ggplot(tree.df, aes(x = pith)) + theme_bw(base_size = 12) +
-  geom_histogram(stat = 'bin',
-                 binwidth = 5,
-                 position = 'stack', 
-                 aes(fill = sp)) +
-  scale_fill_manual(values = speciesColors) +
-  scale_x_continuous(limits = studyPeriod, breaks = seq(studyPeriod[1],studyPeriod[2],50)) +
-  scale_y_continuous(breaks = c(0,50,100)) +
-  labs(x = 'Pith date / sample age (C.E.)', y = 'Count', fill = 'Species') 
-```
-
-
-## Compare proxies
-Standardize and bin data to allow for direct comparison.
-```{r}
-# Modify tree dataframe 
-tree.cor.df <- tree.df %>%
-  mutate(ageCE = plyr::round_any(pith,5)) %>%
-  group_by(sp, ageCE) %>%
-  summarise(count = n()) %>%
-  tidyr::spread(key = sp, value = count) %>%
-  mutate(bepa = ifelse(is.na(bepa),0,bepa),
-         lala = ifelse(is.na(lala),0,lala),
-         pigl = ifelse(is.na(pigl),0,pigl),
-         pima = ifelse(is.na(pima),0,pima),
-         potr = ifelse(is.na(potr),0,potr)) %>%
-  mutate(tree.count = rowSums(.[c('bepa','lala','pigl','pima','potr')])) 
-
-# Use GOA mean from 1550-2010 to standardize both climate datasets. 
-goa.1900 <- goa.df %>%
-  filter(yearCE >= 1900) 
-goa.mean <- mean(goa.1900$temp)
-
-# Bin data into universal 5-year means
-goa.df$yearBins <- cut(goa.df$yearCE,include.lowest = T,right = F,
-                       breaks = seq(min(goa.df$yearCE),max(goa.df$yearCE),5), 
-                       labels = seq(min(goa.df$yearCE),2005,5))
-goa.binned <- goa.df %>%
-  group_by(yearBins) %>%
-  summarise(bin.temp = mean(temp)) %>%
-  mutate(zscore = (bin.temp - goa.mean)) %>%
-  mutate(sign = ifelse(zscore >= 0,'positive','negative'))
-
-
-cru.gs.df$yearBins <- cut(cru.gs.df$yearCE,include.lowest = T,right = F,
-                           breaks = seq(1900,2010,5), 
-                           labels = seq(1900,2005,5))
-cru.binned <- cru.gs.df %>%
-  group_by(yearBins,variable) %>%
-  summarise(bin.mean = mean(mean)) %>%
-  group_by(variable) %>%
-  mutate(zscore = (bin.mean - mean(bin.mean))) %>%
-  mutate(sign = ifelse(zscore >= 0,'positive','negative'))
-
-# Created combined dataframe of standardized, binned proxies for 1550-1895
-goa.1550 <- goa.binned %>%
-  mutate(ageCE = as.numeric(as.character(.$yearBins))) %>%
-  select(-sign,-yearBins) %>%
-  filter(ageCE < 1900)
-
-combined.1550_1895.df <- composite.df %>%
-  select(ageCE, lowMean, highMean) %>%
-  inner_join(., pctBurned, by = 'ageCE') %>%
-  inner_join(., goa.1550, by = 'ageCE') %>%
-  left_join(., tree.cor.df, by = 'ageCE') %>%
-  select(lowMean, highMean, win.pct, bin.temp, tree.count)
-
-# Created combined dataframe of standardized, binned proxies for 1900-2005
-goa.1900 <- goa.binned %>%
-  mutate(ageCE = as.numeric(as.character(.$yearBins))) %>%
-  select(-sign,-yearBins) 
-
-cru.combined <- cru.binned %>%
-  mutate(ageCE = as.numeric(as.character(yearBins))) %>%
-  select(ageCE,variable,bin.mean) %>%
-  spread(key = variable, value = bin.mean)
-
-combined.1900_2010.df <- composite.df %>%
-  inner_join(., pctBurned, by = 'ageCE') %>%
-  inner_join(., cru.combined, by = 'ageCE') %>%
-  inner_join(., goa.1900, by = 'ageCE') %>%
-  left_join(., tree.cor.df, by = 'ageCE') %>%
-  select(lowMean, highMean, win.pct, cru.precip = precip, cru.temp = temp, goa.temp = bin.temp, tree.count)
-```
-
-Plot standardized climate data.
-```{r results = 'asis', echo = FALSE}
-ggplot(goa.binned, 
-         aes(x= as.numeric(as.character(yearBins)), y = zscore)) + theme_bw(base_size = 12) +
-  geom_col(data = filter(cru.binned,variable == 'temp'), 
-           aes(fill = sign, x= as.numeric(as.character(yearBins)), y = zscore)) +
-  geom_step(aes(x= as.numeric(as.character(yearBins)) -1),direction = 'hv') +
-  scale_fill_manual(values = c('negative' = 'dodgerblue4','positive'='red3')) +
-  ylab('Growing season temp.\nanomaly (deg. C)') +
-  scale_y_continuous(sec.axis = dup_axis(name = 'Modeled growing season temp.\nanomaly (deg.C)')) +
-  scale_x_continuous(limits = studyPeriod, breaks = seq(studyPeriod[1],studyPeriod[2],50),
-                     labels = c('',1600,'',1700,'',1800,'',1900,'',2000)) +
-  xlab("Year CE") 
-```
-
-
-
+#### Compare proxies
 
 Calculate Spearman rank correlation among fire, tree, and climate records.
 ```{r}
@@ -418,7 +242,6 @@ kable(
 )
 ```
 
-
 Correlation coefficients and p-values for period 1900-2010 CE.
 ```{r results = 'asis', echo = FALSE}
 kable(
@@ -431,7 +254,6 @@ kable(
   caption = 'P-Value'
 )
 ```
-
 
 Plot scatterplots of linear relationships between temperature and fire proxies for the two periods. 
 ```{r results = 'asis', echo = FALSE}
@@ -462,12 +284,4 @@ ggplot(combined.1900_2010.df, aes(x = lowMean, y = cru.temp)) +
   theme_bw(base_size = 12) +
   labs(x = '50-yr mean biomass burning', y = 'Modeled growing season temp.',title = '1900-2015')
 ```
-
-
-
-
-
-
-
-
 

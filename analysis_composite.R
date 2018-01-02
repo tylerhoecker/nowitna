@@ -114,7 +114,7 @@ ZIlnorm.median = function(parms) {
 }()
 
 #-------------------- RUN ZIL PROCEDURE ----------------------------------#
-dat <- charData
+dat <- as.data.frame(charData)
 #------------------- Parameters 
 # Temporal params
 ageLim      <- c(1950-studyPeriod[2],1950-studyPeriod[1])
