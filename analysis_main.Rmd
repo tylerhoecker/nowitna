@@ -9,7 +9,7 @@ knitr::opts_chunk$set(echo = TRUE, results  = 'hide', message = FALSE, warning =
 
 ## Setup
 
-#### Load the requisite packages
+### Load the requisite packages
 ```{r}
 library(tidyverse) # For data manipulation and plotting
 library(zoo) # For rolling statistics 
@@ -17,15 +17,16 @@ library(Hmisc) # For correlation statistics
 library(knitr) # For formatting this file 
 ```
 
-#### Load data from Rdata file
+### Load data from Rdata file
 ``` {r}
-load('complete_data.Rdata')
+load('data/complete_data.Rdata')
 ```
 To load and/or compile proxies individually, run "load_indv_data.R" before proceeding.
 
-#### Visualize all proxies
+### Visualize all proxies
 
-Plot age-depth models.
+#### Chronological data
+Age-depth models were built in Bacon v2.2 (http://www.chrono.qub.ac.uk/blaauw/bacon.html), using the parameters described in the text (Table 2). 
 ```{r results = 'asis', echo = FALSE}
 ggplot(ageModel.df, aes(x = depth)) + 
   geom_line(aes(y = median)) +
@@ -49,7 +50,8 @@ ggplot(ageModel.df, aes(x = depth)) +
         legend.background = element_rect(fill = "#ffffffaa", colour = "black"))
 ```
 
-Plot lake-specific CHAR records (black line), inferred fire events (black dots), and theshold used to define events (grey line).
+#### Charcoal data
+Lake-specific CHAR records (black line), inferred fire events (black dots), and theshold used to define events (grey line). Processed in CharAnalysis (https://github.com/phiguera/CharAnalysis), using the parameters described in the text (Table 2).
 ```{r results = 'asis', echo = FALSE}
 ggplot(char.df, aes(x=ageCE, y=charAcc)) + theme_bw() +
   geom_step() +
@@ -59,6 +61,10 @@ ggplot(char.df, aes(x=ageCE, y=charAcc)) + theme_bw() +
        x= 'Time (year CE)') +
   facet_wrap(~lake, scales = 'free', ncol = 2)
 ```
+
+Composite biomass burning record from individual records (without peak analysis or interpolation using method in Kelly et al. 2013 (doi: 10.1073/pnas.1305069110). The method estimates the parameters of a zero-inflated log-normal (ZIL) distribution of pooled charcoal counts in continuous moving windows of a user-defined width. In this analysis, 5-year and 50-year window widths are used (2.5 and 25 half-kernel widths, respectively. 
+
+This portion of the analysis is relegated to a separate R script for clarity of the workflow. Window widths and other parameters can be manipulated within the 'analysis_composite.r' script.
 
 Plot the composite record of biomass burning.
 ```{r results = 'asis', echo = FALSE}

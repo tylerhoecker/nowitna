@@ -3,12 +3,12 @@
 # instead of the complete dataset used in the analysis at once.
 ###------------------------------------------------------------------------
 
+## Specify directory on your machine containing data (ends with 'nowitna/data') 
+dataDir <- "~/nowitna/data/"
+
 ## Specify lakes and time period of analysis
 lakes <- c('BB15','DU15','MA15','NW15','SH15','TL15','UR15') 
 studyPeriod <- c(1550,2015)
-
-## Specify directory on your machine containing data (ends with 'nowitna/data') 
-dataDir <- "/Users/tylerhoecker/GitHub/nowitna/data/"
 
 ## Chronological data
 ## Age-depth models were built in Bacon v2.2 (http://www.chrono.qub.ac.uk/blaauw/bacon.html), 
