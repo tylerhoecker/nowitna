@@ -4,7 +4,7 @@
 ###------------------------------------------------------------------------
 
 ## Specify directory on your machine containing data (ends with 'nowitna/data') 
-dataDir <- "~/nowitna/data/"
+dataDir <- "/Users/tylerhoecker/GitHub/nowitna/data/"
 
 ## Specify lakes and time period of analysis
 lakes <- c('BB15','DU15','MA15','NW15','SH15','TL15','UR15') 
@@ -13,7 +13,7 @@ studyPeriod <- c(1550,2015)
 ## Chronological data
 ## Age-depth models were built in Bacon v2.2 (http://www.chrono.qub.ac.uk/blaauw/bacon.html), 
 ## using the parameters described in the text (Table 2).  
-dates <- read_csv(paste0(dataDir,'/ageData_sample_inventory.csv'))
+dates <- read_csv(paste0(dataDir,'ageData_sample_inventory.csv'))
 
 ageModel.df <- map(paste0(dataDir,'ageModel_',lakes,'.csv'), read_csv) %>% 
   `names<-` (lakes) %>%
@@ -71,7 +71,7 @@ charData <- map(paste0(dataDir,'charData_',lakes,'.csv'),read_csv) %>%
 
 ## This portion of the analysis is relegated to a separate R script for 
 ## clarity of the workflow. Window widths and other parameters can be manipulated within the 'analysis_composite.r' script.
-source(file = file.path("analysis_composite.R"))
+source(file = file.path("/Users/tylerhoecker/GitHub/nowitna/optional_scripts/analysis_composite.R"))
 
 ## Observed (historic) fire event data.
 ## Using a GIS, we identified fire perimeters from 1950-2014 that overlaped 
@@ -80,6 +80,44 @@ source(file = file.path("analysis_composite.R"))
 observed.df <- read_csv(paste0(dataDir,'/observedfireData.csv'))
 obs.1km <- filter(observed.df,distance == 1.0) %>%
   rename(obsCE = ageCE)
+
+## Calculate proportion of sites burned through time, 
+## using 50-year windows in continuous 5-year time steps.
+window = 50 # years 
+timeStep = 5 # years
+
+sitesByYear <- char.df %>% # Count the number of sites each year
+  group_by(ageCE) %>%
+  summarise(sites = n()) 
+
+pctBurned <- char.df %>% 
+  filter(!is.na(peakYr)) %>%
+  group_by(peakYr) %>%
+  summarise(n.burned = n()) %>% # Sum number of sites burned each year
+  rename(ageCE = peakYr) %>%
+  full_join(sitesByYear,.) %>%
+  mutate(n.burned = ifelse(!is.na(n.burned),n.burned,0)) %>%
+  # Sum number of sites burned in 50-year windows centered at each timeStep
+  mutate(win.total = rollapply(sites, window/timeStep, fill= NA,
+                               FUN = mean, na.rm =T)) %>%
+  mutate(win.burn = rollsum(n.burned, window/timeStep, fill= NA)) %>%
+  mutate(win.pct = win.burn/win.total*100) 
+
+# Perform same calculation as above for modern period
+modernTime <- seq(1950,2015,1)
+modernSites = data.frame('ageCE' = modernTime, 'sites' = 6)
+
+pctModern <- observed.df %>%
+  filter(distance == 1) %>%
+  group_by(ageCE) %>%
+  summarise(n.burned = n()) %>%
+  full_join(modernSites,.) %>%
+  mutate(n.burned = ifelse(!is.na(n.burned),n.burned,0)) %>%
+  # Sum number of sites burned in 50-year windows centered at each timeStep
+  mutate(win.total = rollapply(sites, window, fill= NA,
+                               FUN = mean, na.rm =T)) %>%
+  mutate(win.burn = rollsum(n.burned, window, fill= NA)) %>%
+  mutate(win.pct = win.burn/win.total*100) 
 
 ## Tree demography data.
 ## The bulk of these data are pith date estimates from tree cross sections developed by Paul Duffy (2006, Ph.D. Dissertation, University of Alaska-Fairbanks). A small proportion, those immediatly adjacent to lake cores, were developed by Meghan Foard and Philip Higuera.
@@ -99,6 +137,15 @@ cru.gs.df <- cru.df %>%
   filter(month %in% c(4:9)) %>%
   group_by(yearCE,variable) %>%
   summarise(mean = mean(value))
+
+
+## Observed fire history data.
+## TRY ANALYSIS OF OBSERVED FIRE DATA AND CLIMATE DATA
+firehist.df <- read_csv(paste0(dataDir,'/observed_nowitna_fires.csv')) %>% 
+  mutate(ageCE = plyr::round_any(FireYear,5)) %>%
+  group_by(ageCE) %>% 
+  summarise(burned_ha = sum(as.numeric(area)) * 0.0001) %>% 
+  mutate(burned_ha = if_else(is.na(burned_ha), 0, burned_ha))
 
 # Standardize and bin climate data to allow for direct comparison.
 # Modify tree dataframe 
@@ -165,12 +212,23 @@ cru.combined <- cru.binned %>%
 
 combined.1900_2010.df <- composite.df %>%
   inner_join(., pctBurned, by = 'ageCE') %>%
+  inner_join(., firehist.df, by = 'ageCE') %>%
   inner_join(., cru.combined, by = 'ageCE') %>%
   inner_join(., goa.1900, by = 'ageCE') %>%
   left_join(., tree.cor.df, by = 'ageCE') %>%
-  select(lowMean, highMean, win.pct, cru.precip = precip, cru.temp = temp, goa.temp = bin.temp, tree.count)
+  select(ageCE, lowMean, highMean, win.pct, burned_ha, cru.precip = precip, cru.temp = temp, goa.temp = bin.temp, tree.count)
 
 
+corr.1550_1895.df <- rcorr(as.matrix(combined.1550_1895.df), type="pearson") 
+corr.1900_2010.df <- rcorr(as.matrix(combined.1900_2010.df), type="pearson") 
 
+
+ggplot(combined.1900_2010.df, aes(x = goa.temp, y = burned_ha),) +
+  geom_point(size = 2) +
+  theme_bw(base_size = 14) +
+  geom_smooth(method = 'lm', se = F, color = 'black')
+
+
+  
 
   
