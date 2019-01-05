@@ -223,11 +223,6 @@ corr.1550_1895.df <- rcorr(as.matrix(combined.1550_1895.df), type="pearson")
 corr.1900_2010.df <- rcorr(as.matrix(combined.1900_2010.df), type="pearson") 
 
 
-ggplot(combined.1900_2010.df, aes(x = goa.temp, y = burned_ha),) +
-  geom_point(size = 2) +
-  theme_bw(base_size = 14) +
-  geom_smooth(method = 'lm', se = F, color = 'black')
-
 
   
 

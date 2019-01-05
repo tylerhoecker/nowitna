@@ -161,7 +161,6 @@ Calculate the difference [years] between observed fire years within 1km of lakes
 char.df <- char.df %>%
   group_by(lake) %>%
   right_join(.,obs.1km, by = 'lake')
-
 kable(
   char.df %>% 
   group_by(lake) %>%
