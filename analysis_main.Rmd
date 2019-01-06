@@ -272,19 +272,19 @@ rp_label <- function(r,p){
   as.character(as.expression(text))                 
 }
 
-r.text = corr.1550_1895.df$r['lowMean','bin.temp'] * corr.1550_1895.df$r['lowMean','bin.temp']
-p.text = corr.1550_1895.df$P['lowMean','bin.temp']
+r.text = round(corr.1550_1895.df$r['lowMean','bin.temp'] ^ 2, 3)
+p.text = round(corr.1550_1895.df$P['lowMean','bin.temp'],3)
 
 ggplot(combined.1550_1895.df, aes(y = lowMean, x = bin.temp)) +
   geom_point(size = 3, color = 'black', fill = 'grey50', shape = 21) +
   theme_bw(base_size = 14) +
-  geom_text(aes(x = 7, y = 1.7), 
+  geom_text(aes(x = 6.5, y = 1.7), 
             label = rp_label(r.text,p.text), parse = T, size = 4.5) +
   ylim(0.75,1.75) +
   labs(y = '50-yr mean biomass burning', x = 'Reconstructed growing season temp.', title = '1550-1895') 
 
-r.text = corr.1900_2010.df$r['lowMean','cru.temp'] * corr.1900_2010.df$r['lowMean','cru.temp']
-p.text = corr.1900_2010.df$P['lowMean','cru.temp']
+r.text = round(corr.1900_2010.df$r['lowMean','cru.temp'] ^ 2, 3)
+p.text = round(corr.1900_2010.df$P['lowMean','cru.temp'], 3)
 
 ggplot(combined.1900_2010.df, aes(y = lowMean, x = cru.temp)) +
   geom_point(size = 3, color = 'black', fill = 'grey50', shape = 21) +

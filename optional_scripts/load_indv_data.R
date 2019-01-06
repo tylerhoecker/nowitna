@@ -1,6 +1,9 @@
 ###------------------------------------------------------------------------
 # Use this script to load data as individual proxies from .csv files, 
 # instead of the complete dataset used in the analysis at once.
+library(Hmisc) # For correlation statistics
+library(tidyverse) # For data manipulation and plotting
+library(zoo) # For rolling statistics 
 ###------------------------------------------------------------------------
 
 ## Specify directory on your machine containing data (ends with 'nowitna/data') 
