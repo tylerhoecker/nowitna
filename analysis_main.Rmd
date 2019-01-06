@@ -1,0 +1,298 @@
+---
+title: 'Analysis for Hoecker and Higuera 2018: '
+output: html_document 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, results  = 'hide', message = FALSE, warning = FALSE)
+```
+
+## Setup
+
+### Load the requisite packages
+```{r}
+library(tidyverse) # For data manipulation and plotting
+library(zoo) # For rolling statistics 
+library(Hmisc) # For correlation statistics
+library(knitr) # For formatting this file 
+```
+
+### Load data from Rdata file
+Specify location of .Rdata file in repository on your machine.
+``` {r}
+load("/Users/tylerhoecker/GitHub/nowitna/data/complete_data.RData")
+```
+To load and/or compile proxies individually, run "load_indv_data.R" before proceeding.
+
+### Visualize all proxies
+
+#### Chronological data
+Age-depth models were built in Bacon v2.2 (http://www.chrono.qub.ac.uk/blaauw/bacon.html), using the parameters described in the text (Table 2). 
+```{r results = 'asis', echo = FALSE}
+ggplot(ageModel.df, aes(x = depth)) + 
+  geom_line(aes(y = median)) +
+  geom_ribbon(aes(ymin = min, ymax = max), alpha = 0.3) +
+  geom_point(data = dates, aes(x = TopDepth, y = CalibratedAge, shape = Type)) + #color = factor(Used)
+  geom_errorbar(data = dates, 
+                aes(x = TopDepth, ymin = CalAgeLCI, ymax = CalAgeUCI)) +
+  geom_vline(data = dates, aes(xintercept = Conf), linetype = 2, color = 'grey20') +
+  scale_shape_discrete('Sample\nType', breaks = c('C14','Pb210'), 
+                       labels = c(as.expression(bquote(''^14~C)),
+                                  as.expression(bquote(''^210~Pb)))) +
+  scale_x_reverse() +
+  scale_y_continuous(trans = 'reverse', 
+                     sec.axis = sec_axis(~1950-., name = 'Median estimated age (Year CE)')) +
+  coord_cartesian(ylim = c(-65,650)) +
+  facet_wrap(~lake, ncol = 4) +  #, scales = 'free'
+  labs(x = 'Sample depth (cm)', y = 'Median estimated age (cal yr BP)') +
+  theme_bw(base_size = 12) +
+  theme(panel.grid.minor = element_blank(),
+        legend.position = c(0.9, 0.1), # c(0,0) bottom left, c(1,1) top-right.
+        legend.background = element_rect(fill = "#ffffffaa", colour = "black"))
+```
+
+#### Charcoal data
+Lake-specific CHAR records (black line), inferred fire events (black dots), and theshold used to define events (grey line). Processed in CharAnalysis (https://github.com/phiguera/CharAnalysis), using the parameters described in the text (Table 2).
+```{r results = 'asis', echo = FALSE}
+ggplot(char.df, aes(x=ageCE, y=charAcc)) + theme_bw() +
+  geom_step() +
+  geom_line(aes(y = (treshPos+charBkg)), color = 'grey50') +
+  geom_point(aes(x = peakYr, y = 0), shape = 21, size = 1.5, fill = 'black') +
+  labs(y = bquote('Charcoal accumulation rate ('*pieces %.% cm^-2 %.% yr^-1*')'),
+       x= 'Time (year CE)') +
+  facet_wrap(~lake, scales = 'free', ncol = 2)
+```
+
+Composite biomass burning record from individual records (without peak analysis or interpolation using method in Kelly et al. 2013 (doi: 10.1073/pnas.1305069110). The method estimates the parameters of a zero-inflated log-normal (ZIL) distribution of pooled charcoal counts in continuous moving windows of a user-defined width. In this analysis, 5-year and 50-year window widths are used (2.5 and 25 half-kernel widths, respectively. 
+
+This portion of the analysis is relegated to a separate R script for clarity of the workflow. Window widths and other parameters can be manipulated within the 'analysis_composite.r' script.
+
+Plot the composite record of biomass burning.
+```{r results = 'asis', echo = FALSE}
+ggplot(composite.df, aes(x=ageCE)) +
+  geom_col(aes(y = highMean), fill = 'grey50', width = 5) +
+  geom_ribbon(aes(ymin = lowCIlower, ymax = lowCIupper), alpha = 0.2) +
+  geom_line(aes(y = lowMean)) +
+  scale_x_continuous(limits = studyPeriod, 
+                     breaks = seq(studyPeriod[1],studyPeriod[2],50)) +
+  scale_y_continuous(breaks = c(0,1,2,3)) +
+  labs(y = 'Biomass burning\n(standardized CHAR)', 
+       x = 'Year CE') +
+  coord_cartesian(ylim = c(0,3)) +
+  theme_bw(base_size = 14) 
+```
+
+Plot time series of estimated pith dates by species.
+```{r results = 'asis', echo = FALSE}
+speciesColors <- c("#E69F00", "#D55E00", "#4286f4","#009E73","#E69F00")
+
+ggplot(tree.df, aes(x = pith)) + theme_bw(base_size = 12) +
+  geom_histogram(stat = 'bin',
+                 binwidth = 5,
+                 position = 'stack', 
+                 aes(fill = sp)) +
+  scale_fill_manual(values = speciesColors) +
+  scale_x_continuous(limits = studyPeriod, breaks = seq(studyPeriod[1],studyPeriod[2],50)) +
+  scale_y_continuous(breaks = c(0,50,100)) +
+  labs(x = 'Pith date / sample age (C.E.)', y = 'Count', fill = 'Species') 
+```
+
+Plot standardized climate data.
+```{r results = 'asis', echo = FALSE}
+ggplot(goa.binned, 
+         aes(x= as.numeric(as.character(yearBins)), y = zscore)) + theme_bw(base_size = 12) +
+  geom_col(data = filter(cru.binned,variable == 'temp'), 
+           aes(fill = sign, x= as.numeric(as.character(yearBins)), y = zscore)) +
+  geom_step(aes(x= as.numeric(as.character(yearBins)) -1),direction = 'hv') +
+  scale_fill_manual(values = c('negative' = 'dodgerblue4','positive'='red3')) +
+  ylab('Growing season temp.\nanomaly (deg. C)') +
+  scale_y_continuous(sec.axis = dup_axis(name = 'Modeled growing season temp.\nanomaly (deg.C)')) +
+  scale_x_continuous(limits = studyPeriod, breaks = seq(studyPeriod[1],studyPeriod[2],50),
+                     labels = c('',1600,'',1700,'',1800,'',1900,'',2000)) +
+  xlab("Year CE") 
+```
+
+
+#### Summarize fire event metrics 
+
+Mean signal to noise indices of records during study period:
+```{r results  = 'asis'}
+kable(
+  char.df %>% 
+    summarise(meanSNI = mean(SNI, na.rm = T)),
+  caption = 'Mean SNI'
+)
+```
+
+Study-wide mean fire return interval [FRI, years] (mean of all FRI pooled, rather than mean of means):
+```{r results  = 'asis'}
+FRI <- char.df %>%
+  select(lake,peakYr,length) %>%
+  filter(!is.na(peakYr)) %>%
+  mutate(FRI =  (lead(peakYr, 1) - peakYr) * -1) 
+
+kable(
+  FRI %>%
+    ungroup(lake) %>%
+    summarise(min = min(FRI, na.rm = T),
+              max = max(FRI, na.rm = T),
+              mean = mean(FRI, na.rm = T),
+              median = median(FRI, na.rm = T),
+              sd = sd(FRI, na.rm = T)),
+  caption = 'Study-wide mean FRI'
+)
+```
+
+Individual mean FRI:
+```{r results = 'asis'}
+kable(
+  FRI %>%
+  group_by(lake) %>%
+  summarise(nFires = n(),
+            mFRI = mean(FRI, na.rm = T),
+            sdFRI = sd(FRI, na.rm = T),
+            length = length[1],
+            FF = nFires/length * 100) ,
+  caption = 'Mean FRI'
+)
+```
+
+Calculate the difference [years] between observed fire years within 1km of lakes and the most recent fire event detected in charcoal record
+```{r results = 'asis'}
+char.df <- char.df %>%
+  group_by(lake) %>%
+  right_join(.,obs.1km, by = 'lake')
+
+kable(
+  char.df %>% 
+  group_by(lake) %>%
+  summarise(observed = obsCE[1],
+            lastPeak = max(peakYr, na.rm = T),
+            difference = abs(obsCE[1] - max(peakYr, na.rm = T))),
+  caption = 'Inferred vs. observed fire event timing.'
+)
+```
+
+## Analysis
+
+#### Calculate proportion of sites burned through time, using 50-year windows in continuous 5-year time steps.
+```{r}
+window = 50 # years 
+timeStep = 5 # years
+
+sitesByYear <- char.df %>% # Count the number of sites each year
+  group_by(ageCE) %>%
+  summarise(sites = n()) 
+
+pctBurned <- char.df %>% 
+  filter(!is.na(peakYr)) %>%
+  group_by(peakYr) %>%
+  summarise(n.burned = n()) %>% # Sum number of sites burned each year
+  rename(ageCE = peakYr) %>%
+  full_join(sitesByYear,.) %>%
+  mutate(n.burned = ifelse(!is.na(n.burned),n.burned,0)) %>%
+  # Sum number of sites burned in 50-year windows centered at each timeStep
+  mutate(win.total = rollapply(sites, window/timeStep, fill= NA,
+                               FUN = mean, na.rm =T)) %>%
+  mutate(win.burn = rollsum(n.burned, window/timeStep, fill= NA)) %>%
+  mutate(win.pct = win.burn/win.total*100) 
+
+# Perform same calculation as above for modern period
+modernTime <- seq(1950,2015,1)
+modernSites = data.frame('ageCE' = modernTime, 'sites' = 6)
+
+pctModern <- observed.df %>%
+  filter(distance == 1) %>%
+  group_by(ageCE) %>%
+  summarise(n.burned = n()) %>%
+  full_join(modernSites,.) %>%
+  mutate(n.burned = ifelse(!is.na(n.burned),n.burned,0)) %>%
+  # Sum number of sites burned in 50-year windows centered at each timeStep
+  mutate(win.total = rollapply(sites, window, fill= NA,
+                               FUN = mean, na.rm =T)) %>%
+  mutate(win.burn = rollsum(n.burned, window, fill= NA)) %>%
+  mutate(win.pct = win.burn/win.total*100) 
+```
+
+Plot the result, a time series of FRI (grey squares), percent sites burned based on the charcoal record (black line), and percent sites burned based on observed fire data since 1950 (red line).
+```{r echo = FALSE}
+ ggplot(filter(pctBurned, ageCE>1550), aes(x = ageCE, y = win.pct)) +
+  geom_step(data = pctModern, direction = 'vh', color = 'red3', size = 1) +
+  geom_step(direction = 'vh') +
+  geom_point(data = FRI, aes(x = peakYr, y = FRI/2), shape = 22, fill = 'grey50', size = 2) +
+  scale_x_continuous(limits = studyPeriod, breaks = seq(studyPeriod[1],studyPeriod[2],50)) +
+  scale_y_continuous(limits = c(0,100), 
+                     sec.axis = sec_axis(trans = ~.*2,name = 'Fire return interval (yr)')) +
+  labs(y = 'Percent of sites burned', x = 'Year CE') +
+  theme_bw(base_size = 14)
+```
+
+#### Compare proxies
+
+Calculate Spearman rank correlation among fire, tree, and climate records.
+```{r}
+corr.1550_1895.df <- rcorr(as.matrix(combined.1550_1895.df), type="pearson") 
+corr.1900_2010.df <- rcorr(as.matrix(combined.1900_2010.df), type="pearson") 
+
+```
+
+Correlation coefficients and p-values for period 1550-1895 CE.
+```{r results = 'asis', echo = FALSE}
+kable(
+  corr.1550_1895.df$r,
+  caption = 'R'
+)
+
+kable(
+  corr.1550_1895.df$P,
+  caption = 'P-Value'
+)
+```
+
+Correlation coefficients and p-values for period 1900-2010 CE.
+```{r results = 'asis', echo = FALSE}
+kable(
+  corr.1900_2010.df$r,
+  caption = 'R'
+)
+
+kable(
+  corr.1900_2010.df$P,
+  caption = 'P-Value'
+)
+```
+
+Plot scatterplots of linear relationships between temperature and fire proxies for the two periods. 
+```{r results = 'asis', echo = FALSE}
+rp_label <- function(r,p){
+  r.input = r; p.input = p
+  text = substitute(italic(R)^2~"="~r.input*","~~italic(p)~"="~p.input,
+                    list(r.input = format(r, digits = 2),
+                         p.input = format(p, digits = 2)))
+  as.character(as.expression(text))                 
+}
+
+r.text = corr.1550_1895.df$r['lowMean','bin.temp'] * corr.1550_1895.df$r['lowMean','bin.temp']
+p.text = corr.1550_1895.df$P['lowMean','bin.temp']
+
+ggplot(combined.1550_1895.df, aes(y = lowMean, x = bin.temp)) +
+  geom_point(size = 3, color = 'black', fill = 'grey50', shape = 21) +
+  theme_bw(base_size = 14) +
+  geom_text(aes(x = 7, y = 1.7), 
+            label = rp_label(r.text,p.text), parse = T, size = 4.5) +
+  ylim(0.75,1.75) +
+  labs(y = '50-yr mean biomass burning', x = 'Reconstructed growing season temp.', title = '1550-1895') 
+
+r.text = corr.1900_2010.df$r['lowMean','cru.temp'] * corr.1900_2010.df$r['lowMean','cru.temp']
+p.text = corr.1900_2010.df$P['lowMean','cru.temp']
+
+ggplot(combined.1900_2010.df, aes(y = lowMean, x = cru.temp)) +
+  geom_point(size = 3, color = 'black', fill = 'grey50', shape = 21) +
+  geom_smooth(method = 'lm', se = F, color = 'black', size = 1) +
+  geom_text(aes(x = 10, y = 1.7), 
+            label = rp_label(r.text,p.text), parse = T, size = 4.5) +
+  theme_bw(base_size = 14) +
+  ylim(0.75,1.75) +
+  labs(y = '50-yr mean biomass burning', x = 'Modeled growing season temp.',title = '1900-2015') 
+```
+

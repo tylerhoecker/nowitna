@@ -225,5 +225,3 @@ corr.1900_2010.df <- rcorr(as.matrix(combined.1900_2010.df), type="pearson")
 
 
   
-
-  
