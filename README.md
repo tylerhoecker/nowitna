@@ -1,4 +1,4 @@
-This compendium contains data and code associated with the following article:
+This compendium contains data and code associated with:
 
 Hoecker TJ, Higuera PE. 2018. Forest succession and climate variability interacted to control fire activity over the last four centuries in an Alaskan boreal forest. *Landscape Ecology* DOI: doi.org/10.1007/s10980-018-00766-8
 
