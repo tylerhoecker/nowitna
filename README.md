@@ -1,6 +1,6 @@
 This compendium contains data and code associated with:
 
-Hoecker TJ, Higuera PE. 2018. Forest succession and climate variability interacted to control fire activity over the last four centuries in an Alaskan boreal forest. *Landscape Ecology* DOI: doi.org/10.1007/s10980-018-00766-8
+Hoecker TJ, Higuera PE. 2019. Forest succession and climate variability interacted to control fire activity over the last four centuries in an Alaskan boreal forest. *Landscape Ecology* DOI: doi.org/10.1007/s10980-018-00766-8
 
 Data are stored in this repository (in `data/`), and are also in a [Dryad Data Repository: doi.org/10.5061/dryad.hg19c6n](doi.org/10.5061/dryad.hg19c6n)
 
