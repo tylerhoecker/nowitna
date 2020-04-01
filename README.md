@@ -12,4 +12,4 @@ The code reproduces simplified versions of the published figures, and complete v
 
 Alternatively, individual datasets can be loaded using the `load_indv_data.R` script before proceeding with the analysis in `analysis_main`. `load_indv_data.R` performs some minor data wrangling procedures, and calls upon `analysis_composite.R` for developing the composite biomass burning record.
 
-
+[![DOI](https://zenodo.org/badge/104701659.svg)](https://zenodo.org/badge/latestdoi/104701659)
